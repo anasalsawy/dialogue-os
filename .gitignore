@@ -1,0 +1,9 @@
+# Local/private files
+.env
+*.key
+*.pem
+secrets/
+private/
+runtime/
+logs/
+.DS_Store
