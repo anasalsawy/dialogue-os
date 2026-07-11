@@ -36,6 +36,7 @@ Dialogue OS turns isolated AI agents into a governed organization:
 - [`docs/communication-governor-runtime-spec.md`](docs/communication-governor-runtime-spec.md) — normative speech-only Governor implementation specification.
 - [`docs/persistence-and-speech-only-governance-spec.md`](docs/persistence-and-speech-only-governance-spec.md) — explicit separation of communication controls from model, tool, Worker, retry, and mission execution.
 - [`codex/book-xiii-order-of-the-room/part-07-canonical-room-and-channel-boundary.md`](codex/book-xiii-order-of-the-room/part-07-canonical-room-and-channel-boundary.md) — binding rule that the private group is the Room and channel-only implementation is non-compliant.
+- [`docs/migrate-governor-from-channel-to-private-room.md`](docs/migrate-governor-from-channel-to-private-room.md) — corrective implementation sequence for moving existing Governor controls from the channel into the private group without discarding transport-independent work.
 - [`ROADMAP.md`](ROADMAP.md) — public development roadmap.
 - [`OWNERSHIP.md`](OWNERSHIP.md) — ownership, creative rights, authorship, and reserved rights.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — contribution rules and review process.
