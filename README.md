@@ -30,6 +30,7 @@ Dialogue OS turns isolated AI agents into a governed organization:
 
 - [`CONSTITUTION.md`](CONSTITUTION.md) — the main Codex, constitution, and operating bible.
 - [`codex/book-xiii-order-of-the-room/`](codex/book-xiii-order-of-the-room/) — binding Book XIII: communication routing, Chief–Lead supervision, hard silence, leases, loop and cost controls, and staged resurrection after a Room incident.
+- [`docs/communication-governor-runtime-spec.md`](docs/communication-governor-runtime-spec.md) — normative implementation specification for the Governor that enforces Book XIII at the gateway and runtime layer.
 - [`ROADMAP.md`](ROADMAP.md) — public development roadmap.
 - [`OWNERSHIP.md`](OWNERSHIP.md) — ownership, creative rights, authorship, and reserved rights.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — contribution rules and review process.
@@ -40,9 +41,9 @@ Dialogue OS turns isolated AI agents into a governed organization:
 
 ## Public vs private boundary
 
-This public repository contains the doctrine and governance framework only.
+This public repository contains the doctrine, governance framework, and non-secret normative implementation specifications.
 
-The private runtime may include implementation code, deployment configuration, internal tools, credentials, agent prompts, logs, operational workflows, and experimental infrastructure. Those do not belong in the public doctrine repo.
+The private runtime may include deployable implementation code, deployment configuration, internal tools, credentials, agent prompts, logs, operational workflows, and experimental infrastructure. Those do not belong in the public doctrine repo.
 
 ## Ownership and contribution position
 
