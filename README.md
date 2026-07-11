@@ -2,7 +2,7 @@
 
 **Dialogue OS** is a constitutional and operational framework for persistent multi-agent systems.
 
-It defines how AI agents should be organized when they are expected to operate continuously, delegate work, supervise each other, preserve memory, report evidence, escalate blockers, and remain accountable to a human operator.
+It defines how AI agents should be organized when they are expected to operate continuously, delegate work, supervise each other, preserve memory, report evidence, escalate blockers, adapt through failure, and remain accountable to a human operator.
 
 Dialogue OS is not a single prompt and not a finished runtime. It is the doctrine, governance layer, and operating bible for building persistent agent organizations.
 
@@ -15,22 +15,25 @@ Dialogue OS is not a single prompt and not a finished runtime. It is the doctrin
 
 ## Core idea
 
-> No important work should be done alone, unseen, unscored, or unremembered.
+> No important work should be done alone, unseen, unscored, unremembered, or abandoned merely because one attempt failed.
 
 Dialogue OS turns isolated AI agents into a governed organization:
 
 - The **Human** remains sovereign.
-- The **Chief / Codex** governs execution.
-- **Lead Agents** supervise domains.
-- **Worker Agents** execute bounded missions.
+- The **Chief / Codex** governs execution and preserves mission continuity.
+- **Lead Agents** supervise domains and adapt through blockers.
+- **Worker Agents** execute bounded missions and return evidence.
 - **Watchers** observe, score, challenge, and preserve accountability.
 - The **War Room** exposes the organism to the human operator.
+- The **Communication Governor** controls routing and speech.
+- The **Cognition Interlock** stops hidden model/tool loops without silently killing the mission.
 
 ## Repository contents
 
 - [`CONSTITUTION.md`](CONSTITUTION.md) — the main Codex, constitution, and operating bible.
-- [`codex/book-xiii-order-of-the-room/`](codex/book-xiii-order-of-the-room/) — binding Book XIII: communication routing, Chief–Lead supervision, hard silence, leases, loop and cost controls, and staged resurrection after a Room incident.
+- [`codex/book-xiii-order-of-the-room/`](codex/book-xiii-order-of-the-room/) — binding Book XIII: communication routing, Chief–Lead supervision, hard silence, leases, loop and cost controls, non-abandonment, adaptive detours, cognition interlock, and staged resurrection after a Room incident.
 - [`docs/communication-governor-runtime-spec.md`](docs/communication-governor-runtime-spec.md) — normative implementation specification for the Governor that enforces Book XIII at the gateway and runtime layer.
+- [`docs/persistence-and-cognition-interlock-spec.md`](docs/persistence-and-cognition-interlock-spec.md) — mandatory runtime addendum distinguishing failed attempts from active missions and requiring gateway-level suspension of model/tool loops with checkpointed continuation.
 - [`ROADMAP.md`](ROADMAP.md) — public development roadmap.
 - [`OWNERSHIP.md`](OWNERSHIP.md) — ownership, creative rights, authorship, and reserved rights.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — contribution rules and review process.
