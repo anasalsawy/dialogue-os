@@ -29,6 +29,7 @@ Dialogue OS turns isolated AI agents into a governed organization:
 ## Repository contents
 
 - [`CONSTITUTION.md`](CONSTITUTION.md) — the main Codex, constitution, and operating bible.
+- [`codex/book-xiii-order-of-the-room/`](codex/book-xiii-order-of-the-room/) — binding Book XIII: communication routing, Chief–Lead supervision, hard silence, leases, loop and cost controls, and staged resurrection after a Room incident.
 - [`ROADMAP.md`](ROADMAP.md) — public development roadmap.
 - [`OWNERSHIP.md`](OWNERSHIP.md) — ownership, creative rights, authorship, and reserved rights.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — contribution rules and review process.
