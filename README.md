@@ -2,7 +2,7 @@
 
 **Dialogue OS** is a constitutional and operational framework for persistent multi-agent systems.
 
-It defines how AI agents should be organized when they are expected to operate continuously, delegate work, supervise each other, preserve memory, report evidence, escalate blockers, adapt through failure, and remain accountable to a human operator.
+It defines how AI agents should be organized when they are expected to operate continuously, delegate work, supervise each other, preserve memory, report evidence, escalate blockers, persist through failure, and remain accountable to a human operator.
 
 Dialogue OS is not a single prompt and not a finished runtime. It is the doctrine, governance layer, and operating bible for building persistent agent organizations.
 
@@ -20,20 +20,22 @@ Dialogue OS is not a single prompt and not a finished runtime. It is the doctrin
 Dialogue OS turns isolated AI agents into a governed organization:
 
 - The **Human** remains sovereign.
-- The **Chief / Codex** governs execution and preserves mission continuity.
-- **Lead Agents** supervise domains and adapt through blockers.
+- The **Chief / Codex** receives missions, decomposes them, assigns Leads, and supervises continuously.
+- **Lead Agents** supervise domains, Workers, and mission execution.
 - **Worker Agents** execute bounded missions and return evidence.
 - **Watchers** observe, score, challenge, and preserve accountability.
-- The **War Room** exposes the organism to the human operator.
-- The **Communication Governor** controls routing and speech.
-- The **Cognition Interlock** stops hidden model/tool loops without silently killing the mission.
+- The private Telegram **group is the canonical Room** where the organization lives and dialogue remains visible.
+- The Telegram **channel is optional and secondary**, used only for selected publication, alerts, or final reports.
+- The **Communication Governor** controls routing and speech only.
+- Silent reasoning, tools, Workers, retries, browsing, coding, research, and long-running work remain unconstrained by speech controls.
 
 ## Repository contents
 
 - [`CONSTITUTION.md`](CONSTITUTION.md) — the main Codex, constitution, and operating bible.
-- [`codex/book-xiii-order-of-the-room/`](codex/book-xiii-order-of-the-room/) — binding Book XIII: communication routing, Chief–Lead supervision, hard silence, leases, loop and cost controls, non-abandonment, adaptive detours, cognition interlock, and staged resurrection after a Room incident.
-- [`docs/communication-governor-runtime-spec.md`](docs/communication-governor-runtime-spec.md) — normative implementation specification for the Governor that enforces Book XIII at the gateway and runtime layer.
-- [`docs/persistence-and-cognition-interlock-spec.md`](docs/persistence-and-cognition-interlock-spec.md) — mandatory runtime addendum distinguishing failed attempts from active missions and requiring gateway-level suspension of model/tool loops with checkpointed continuation.
+- [`codex/book-xiii-order-of-the-room/`](codex/book-xiii-order-of-the-room/) — binding Book XIII: private-group Room law, Chief–Lead supervision, routed communication, speech-only silence, leases, message-loop containment, persistent silent work, and staged resurrection.
+- [`docs/communication-governor-runtime-spec.md`](docs/communication-governor-runtime-spec.md) — normative speech-only Governor implementation specification.
+- [`docs/persistence-and-speech-only-governance-spec.md`](docs/persistence-and-speech-only-governance-spec.md) — explicit separation of communication controls from model, tool, Worker, retry, and mission execution.
+- [`codex/book-xiii-order-of-the-room/part-07-canonical-room-and-channel-boundary.md`](codex/book-xiii-order-of-the-room/part-07-canonical-room-and-channel-boundary.md) — binding rule that the private group is the Room and channel-only implementation is non-compliant.
 - [`ROADMAP.md`](ROADMAP.md) — public development roadmap.
 - [`OWNERSHIP.md`](OWNERSHIP.md) — ownership, creative rights, authorship, and reserved rights.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — contribution rules and review process.
