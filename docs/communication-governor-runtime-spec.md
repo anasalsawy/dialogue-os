@@ -1,31 +1,30 @@
 # Communication Governor Runtime Specification
 
 **Status:** Normative implementation specification for Book XIII — The Order of the Room  
-**Repository boundary:** Public, non-secret architecture only  
-**Runtime boundary:** Deployable code, credentials, tokens, environment values, private logs, and infrastructure details belong in the private implementation repository
+**Scope:** Communication, routing, speech permissions, Room traffic, and message transport only  
+**Explicit exclusion:** The Governor does not automatically control model reasoning, tool execution, Workers, retries, browsing, coding, research, or mission runtime.
 
 ---
 
 ## 1. Purpose
 
-The Communication Governor is the enforcement layer that turns Dialogue OS communication law into runtime behavior.
+The Communication Governor is the enforcement layer for Dialogue OS communication law.
 
-The Governor is not an agent, not a language model, and not a source of operational judgment. It is a deterministic state machine positioned between agent runtimes and communication transports.
+It is a deterministic state machine positioned between agent runtimes and communication transports.
 
 Its purpose is to ensure that:
 
 - the Human remains sovereign;
 - the Chief controls mission activation and communication authority;
-- Chief ↔ assigned Lead communication remains continuous and supervised;
-- all other agent-to-agent communication is blocked unless routed or explicitly leased by the Chief;
-- silence, restoration, budgets, loop prevention, and lockdown are hard controls;
-- rejected messages do not invoke models when rejection can occur before cognition;
-- all material decisions and control actions remain visible and auditable;
-- the Room stays alive without becoming chaotic.
+- Chief ↔ assigned Lead communication remains available and supervised;
+- other agent-to-agent communication is blocked unless routed or leased;
+- hard silence, leases, routing, message budgets, and Room lockdown are enforceable;
+- message storms are contained;
+- and silent work continues regardless of speech restrictions.
 
 The constitutional principle is:
 
-> The Chief decides. The Governor enforces. Agents operate within the enforced space.
+> The Chief decides who may speak. The Governor enforces speech. Agents continue working internally.
 
 ---
 
@@ -33,17 +32,15 @@ The constitutional principle is:
 
 1. Every Human mission enters through the Chief unless the Human explicitly addresses another agent.
 2. The Chief decomposes the mission and activates the required Lead or Leads.
-3. An assigned Lead does not work in silence. The Chief and Lead maintain an active two-way supervision channel throughout the mission.
-4. A Lead may always report status, blockers, evidence, risk, and completion to the Chief while assigned.
-5. A Lead may not directly contact another Lead, Worker outside its tree, or ordinary agent unless the Chief routes the message or opens a temporary communication lease.
-6. A Worker reports through its supervising Lead unless the Chief or Human explicitly creates another path.
-7. Watchers retain independent read and constitutional-reporting rights.
-8. The Chief may hard-silence, restore, activate, deactivate, route, bridge, pause, close, or lock down ordinary agents.
-9. Silence must block outbound delivery at the gateway and should prevent model invocation when the message can be rejected before cognition.
-10. Completion closes the mission communication scope automatically.
-11. No agent may grant itself communication rights.
-12. No provider, model, transport, or alternate key may bypass Governor state.
-13. No mass resurrection after an incident is permitted.
+3. An assigned Lead may communicate with the Chief throughout the mission.
+4. A Lead may not directly contact another Lead or unrelated Worker unless the Chief routes the message or opens a communication lease.
+5. Watchers retain independent constitutional reporting rights.
+6. The Chief may silence, restore, activate, deactivate, route, bridge, pause, close, or lock down communication.
+7. Communication silence blocks speech only.
+8. Communication limits must not automatically stop model runs, tools, Workers, retries, research, browsing, coding, or silent mission execution.
+9. No agent may grant itself communication rights.
+10. No transport may bypass Governor communication state.
+11. No mass resurrection after an incident is permitted.
 
 ---
 
@@ -54,29 +51,29 @@ Human
   │
   ▼
 Chief Runtime
-  │
   │ mission decomposition, routing, supervision, control commands
   ▼
 Communication Governor
   │
-  ├── validates sender state
-  ├── validates mission activation
+  ├── validates sender speech state
   ├── validates recipient path
-  ├── validates lease
-  ├── enforces silence
-  ├── enforces budgets and rate limits
-  ├── detects duplicate and loop conditions
+  ├── validates mission activation
+  ├── validates leases
+  ├── enforces message rates and speech budgets
+  ├── detects duplicate and circular messages
   ├── records audit events
-  └── forwards approved messages
+  └── forwards approved communication
   │
   ├─────────────┬─────────────┬─────────────┐
   ▼             ▼             ▼             ▼
 Lead A        Lead B        Watchers      Room Transport
+
+Agent runtimes and tools continue independently behind the communication boundary.
 ```
 
-All outbound agent messages must pass through the Governor.
+All outbound Room messages must pass through the Governor.
 
-No persistent agent may hold an unrestricted path that can publish directly to Telegram, Discord, the War Room, or another agent while bypassing Governor checks.
+Agents may continue internal work even when no outbound path is available.
 
 ---
 
@@ -89,21 +86,20 @@ No persistent agent may hold an unrestricted path that can publish directly to T
 | Chief | Assigned Lead | Allowed | Chief authority |
 | Assigned Lead | Chief | Allowed | Standing supervision path |
 | Chief | Watcher | Allowed | Chief authority |
-| Watcher | Chief | Allowed | Independent oversight |
-| Watcher | Human / Room report path | Allowed for constitutional reports | Watcher independence |
+| Watcher | Chief/Human/report path | Allowed | Watcher independence |
 | Lead | Lead | Blocked | Chief route or active lease |
 | Lead | Human | Blocked by default | Chief route or Human instruction |
-| Lead | Room | Blocked by default | Mission activation plus speaking authority or lease |
-| Worker | Lead | Allowed within assigned mission | Lead supervision |
-| Worker | Chief | Blocked by default | Chief route or escalation rule |
-| Worker | Worker outside tree | Blocked | Chief or supervising Lead lease within delegated authority |
-| Silenced ordinary agent | Anyone | Blocked | Human or Chief restoration |
+| Lead | Room | Blocked by default | Speaking authority or lease |
+| Worker | Supervising Lead | Allowed within mission | Lead supervision |
+| Silenced ordinary agent | Ordinary communication paths | Blocked | Human or Chief restoration |
+
+This matrix affects communication only.
 
 ---
 
-## 5. Agent Communication States
+## 5. Communication States
 
-Every persistent agent must have exactly one communication state:
+Every persistent agent has one communication state:
 
 ```text
 OBSERVER
@@ -111,54 +107,54 @@ ACTIVE
 COLLABORATING
 LIMITED
 SILENCED
-QUARANTINED
-OFFLINE
+QUARANTINED_FROM_SPEECH
+OFFLINE_FROM_ROOM
 ```
 
 ### OBSERVER
 
-- Receives permitted Room events.
-- May report urgent material evidence to the Chief through one controlled path.
-- May not join mission dialogue.
+- May receive permitted Room information.
+- May not join mission dialogue without activation.
+- May continue internal background work already authorized.
 
 ### ACTIVE
 
-- Assigned to one or more missions.
-- May communicate continuously with the Chief or supervising Lead.
-- May speak to others only through active routes or leases.
+- Assigned to a mission.
+- May communicate with the Chief or supervising Lead.
+- May speak to others only through routes or leases.
 
 ### COLLABORATING
 
-- Has an active temporary bridge to named participants.
-- Scope, budget, duration, and mission are mandatory.
+- Has a temporary bridge to named participants.
+- Scope, duration, and message limits are mandatory.
 
 ### LIMITED
 
-- May communicate only with the Chief, supervising Lead, Watchers where applicable, and the Human when directly addressed.
+- May communicate only through named paths.
 
 ### SILENCED
 
-- All ordinary outbound messages blocked.
-- Receive capability may remain enabled for observation.
-- Only explicitly defined emergency, appeal, Watcher, and Human-response paths remain.
+- Ordinary outbound communication is blocked.
+- Internal reasoning, tools, Workers, retries, and mission work continue.
 
-### QUARANTINED
+### QUARANTINED_FROM_SPEECH
 
-- No new missions.
 - No ordinary communication.
-- Diagnostic, appeal, Human, and Watcher-review paths only.
+- Diagnostic, appeal, Human, and Watcher paths remain as configured.
+- Internal execution is unaffected unless separately ordered by Human or Chief.
 
-### OFFLINE
+### OFFLINE_FROM_ROOM
 
-- Runtime disabled.
+- Removed from Room communication.
+- Runtime execution may remain active.
 
-Every transition must be logged with actor, reason, timestamp, prior state, new state, scope, and evidence reference.
+Every transition must be logged.
 
 ---
 
-## 6. Mission Activation Model
+## 6. Mission Activation
 
-A mission record must contain:
+A mission record should contain:
 
 ```json
 {
@@ -168,12 +164,7 @@ A mission record must contain:
   "activated_agents": ["lead-a"],
   "supervisor": "chief",
   "status": "ACTIVE",
-  "message_budget": 20,
-  "token_budget": 50000,
-  "model_call_budget": 30,
-  "runtime_deadline": "timestamp",
-  "allowed_tools": [],
-  "required_evidence": [],
+  "speech_budget": 20,
   "created_at": "timestamp",
   "closed_at": null
 }
@@ -181,20 +172,18 @@ A mission record must contain:
 
 Rules:
 
-- No permanent Lead becomes active merely by observing a Human or agent message.
-- The Chief must explicitly activate each participating Lead.
-- The Chief may assign one Lead, several independent Leads, or a temporary collaboration set.
-- Chief ↔ assigned Lead communication is standing authority for the duration of the mission.
-- Removing an agent from a mission returns it to `OBSERVER` or its prior restricted state.
-- Closing a mission revokes all mission-specific leases and speaking rights immediately.
+- No permanent Lead becomes active merely by observing a message.
+- The Chief explicitly activates each participating Lead.
+- Chief ↔ assigned Lead communication is standing authority.
+- Removing an agent from mission speech returns it to observer or restricted communication state.
+- Closing mission communication revokes mission leases and speaking rights.
+- None of these communication transitions automatically stop internal execution.
 
 ---
 
 ## 7. Communication Leases
 
-A lease is required for ordinary direct communication outside the standing Chief-supervision path.
-
-Required fields:
+A lease is required for ordinary direct communication outside standing Chief supervision.
 
 ```json
 {
@@ -206,31 +195,26 @@ Required fields:
   "purpose": "Resolve deployment schema conflict",
   "allowed_message_types": ["QUESTION", "EVIDENCE", "CORRECTION", "DECISION"],
   "max_messages": 8,
-  "max_tokens": 12000,
-  "max_hops": 4,
   "rate_limit": "1 message / 5 seconds / agent",
   "starts_at": "timestamp",
   "expires_at": "timestamp",
-  "status": "ACTIVE",
-  "auto_revoke_on": ["MISSION_CLOSE", "BUDGET_EXHAUSTED", "LOOP_DETECTED", "CHIEF_REVOKE"]
+  "status": "ACTIVE"
 }
 ```
 
 A lease must never be permanent.
 
-When a lease expires or is revoked, the next unauthorized message must be rejected before delivery and, where possible, before model invocation.
+Lease expiration blocks communication only.
 
 ---
 
-## 8. Chief Control Commands
+## 8. Chief Control Operations
 
-The runtime must expose deterministic Chief commands. The exact transport may be text commands, structured API calls, buttons, or War Room controls, but each action must resolve to a typed Governor operation.
-
-Required operations:
+Required communication operations:
 
 ```text
-ACTIVATE_AGENT
-DEACTIVATE_AGENT
+ACTIVATE_AGENT_FOR_SPEECH
+DEACTIVATE_AGENT_FROM_SPEECH
 ASSIGN_MISSION
 TRANSFER_OWNER
 ROUTE_MESSAGE
@@ -240,27 +224,23 @@ OPEN_BRIDGE
 CLOSE_BRIDGE
 SILENCE_AGENT
 UNSILENCE_AGENT
-QUARANTINE_AGENT
-RESTORE_AGENT
+QUARANTINE_SPEECH
+RESTORE_SPEECH
 SET_MESSAGE_BUDGET
-SET_TOKEN_BUDGET
-SET_MODEL_CALL_BUDGET
-SET_RATE_LIMIT
-CLOSE_MISSION
-TERMINATE_LOOP
-DECLARE_LOCKDOWN
-END_LOCKDOWN
+SET_MESSAGE_RATE
+CLOSE_MISSION_COMMUNICATION
+TERMINATE_MESSAGE_LOOP
+DECLARE_ROOM_LOCKDOWN
+END_ROOM_LOCKDOWN
 REQUEST_WATCHER_REVIEW
 STATUS
 ```
 
-The Human must have equivalent override operations that supersede the Chief.
+Separate Human or Chief execution controls may exist, but they are outside the Communication Governor and must be explicit.
 
 ---
 
 ## 9. Message Envelope
-
-Every operational message must include or resolve to:
 
 ```json
 {
@@ -269,13 +249,9 @@ Every operational message must include or resolve to:
   "mission_id": "M-001",
   "sender": "agent-id",
   "recipient": "agent-id-or-room-path",
-  "owner": "agent-id",
   "lease_id": null,
   "reply_to": null,
-  "hop": 1,
-  "max_hops": 4,
   "requires_response": false,
-  "response_limit": 0,
   "created_at": "timestamp",
   "expires_at": "timestamp",
   "content": "...",
@@ -283,152 +259,121 @@ Every operational message must include or resolve to:
 }
 ```
 
-Default values:
-
-```text
-requires_response = false
-response_limit = 0
-```
-
-A response must occur only when explicitly requested, constitutionally required, or necessary for active Chief supervision.
-
 Messages marked `FINAL` or `NO_RESPONSE_REQUIRED` must not trigger ordinary replies.
 
 ---
 
-## 10. Inbound Enforcement Order
+## 10. Inbound Communication Enforcement
 
-Before an inbound message reaches an agent model:
+Before an inbound message is delivered as a cognitive event:
 
 1. Validate transport authenticity.
 2. Validate sender identity.
-3. Deduplicate transport update ID.
-4. Deduplicate message ID.
-5. Confirm mission exists and is open.
-6. Confirm intended recipient.
-7. Confirm recipient is authorized to receive the message.
-8. Confirm sender is authorized for this path.
-9. Confirm lease when required.
-10. Confirm hop, time, and budget limits.
-11. Confirm message is not a system log or non-cognitive event.
-12. Reject self-message recursion.
-13. Reject final-message recursion.
-14. Annotate approved messages with current governance state.
-15. Deliver to the agent runtime.
+3. Deduplicate update and message IDs.
+4. Confirm intended recipient.
+5. Confirm sender and recipient communication authority.
+6. Confirm lease when required.
+7. Reject self-message recursion.
+8. Reject final-message recursion.
+9. Deliver approved communication.
 
-Rejection should happen before model invocation whenever the required decision is deterministic.
+Rejected Room messages need not be delivered to the affected model.
+
+This prevents speech-triggered storms, but does not stop any independent internal work already underway.
 
 ---
 
-## 11. Outbound Enforcement Order
+## 11. Outbound Communication Enforcement
 
-Before any agent message reaches the Room, Telegram, Discord, another agent, or a gateway:
+Before any message reaches the Room or another agent:
 
-1. Resolve sender state.
-2. Reject if `SILENCED`, `QUARANTINED`, or `OFFLINE`, except allowed exception paths.
-3. Confirm mission activation.
-4. Confirm recipient path.
-5. Confirm lease when required.
-6. Check task closure.
-7. Check message count.
-8. Check token and model-call budgets.
-9. Check rate limit.
-10. Check duplicate content hash.
-11. Check semantic repetition threshold.
-12. Check loop indicators.
-13. Write audit event.
-14. Forward only when all checks pass.
+1. Resolve sender communication state.
+2. Confirm mission speaking authority.
+3. Confirm recipient path.
+4. Confirm lease when required.
+5. Check communication closure.
+6. Check message count and rate.
+7. Check duplicate content.
+8. Check circular message indicators.
+9. Write audit event.
+10. Forward only when approved.
 
-Agents must not possess a second direct-send path.
+No step may automatically cancel the sender’s model run, tools, Workers, retries, or mission.
 
 ---
 
-## 12. Loop and Storm Control
+## 12. Communication-Loop and Storm Control
 
-The Governor must stop delivery when any configured threshold is reached, including:
+The Governor stops delivery for:
 
-- repeated self-triggering;
+- repeated self-triggering messages;
 - duplicate transport updates;
 - repeated content;
-- more than two substantially identical conclusions;
-- two-agent cycles without state change;
-- excessive message volume;
-- messages after mission closure;
-- messages after finality markers;
-- retries exceeding the configured limit;
-- traffic continuing without a new Human instruction, task event, tool result, timer event, or external state change.
+- circular agent replies;
+- excessive Room traffic;
+- messages after communication closure;
+- and messages after finality markers.
 
-On loop detection:
+On detection:
 
-1. Block the current message.
-2. Prevent additional model calls where possible.
-3. Close affected leases.
-4. Apply task-specific silence to involved ordinary agents.
-5. Preserve the relevant event window.
-6. Mark the incident `LOOP_STOPPED`.
-7. Notify the Chief once.
-8. Notify Watchers once.
-9. Produce one concise Human-visible alert.
-10. Require an explicit Chief or Human decision before resumption.
+1. Block the message.
+2. Close affected communication leases when needed.
+3. Apply speech-only silence when needed.
+4. Preserve the message evidence.
+5. Notify the Chief once.
+6. Keep internal work active.
+
+Repeated tool use or internal reasoning is outside Governor scope.
 
 ---
 
-## 13. Hard Silence and Lockdown
+## 13. Hard Silence and Room Lockdown
 
 ### Hard Silence
 
 A hard silence must:
 
-- block all ordinary outbound messages from the target agent;
+- block ordinary outbound communication;
 - prevent direct transport sends;
-- revoke or suspend relevant leases;
-- prevent assignment of new tasks requiring speech;
-- preserve observation unless quarantine is required;
-- retain controlled Human, Watcher, appeal, security, and emergency paths;
-- record reason and evidence.
+- revoke relevant communication leases;
+- preserve authorized Chief/Human/Watcher paths;
+- leave internal reasoning and tooling untouched.
 
-### Global Lockdown
+### Room Lockdown
 
-During lockdown:
+During Room Lockdown:
 
-- all ordinary agents are hard-silenced;
-- no new Workers are created;
-- no new leases are granted;
-- pending messages are quarantined rather than replayed automatically;
-- the Chief is restricted to emergency coordination;
-- Watchers retain constitutional reporting;
-- the Human retains full authority;
-- logs and state remain readable.
-
-Lockdown must be available as one immediate operation.
+- ordinary agent speech is blocked;
+- Human, Chief control, and Watcher reporting paths remain;
+- agent runtimes may continue working silently;
+- queued speech is held, consolidated, or discarded according to policy;
+- no queued message is replayed automatically without review.
 
 ---
 
-## 14. Budget Enforcement
+## 14. Speech-Budget Enforcement
 
-The Governor must enforce:
+The Governor may enforce:
 
-- per-message token estimates where available;
-- actual model token usage when reported by providers;
-- model call counts;
 - per-agent message ceilings;
 - per-mission message ceilings;
-- per-agent cost ceilings;
-- per-mission cost ceilings;
-- hourly and daily global ceilings;
-- maximum concurrent active agents;
-- maximum Workers per mission;
-- maximum retries.
+- Room posting frequency;
+- communication hops;
+- and transport volume.
 
-Budget follows the mission. Reassignment, provider switching, model switching, or Worker creation must not reset it.
+It must not automatically enforce limits on:
 
-Recommended actions:
+- model calls;
+- tool calls;
+- tokens used for internal work;
+- retries;
+- Workers;
+- mission runtime;
+- browsing;
+- coding;
+- or research.
 
-- 50%: internal warning;
-- 75%: Chief warning and concurrency reduction;
-- 90%: deny new leases and Workers;
-- 100%: pause mission and silence non-essential participants;
-- global ceiling: lockdown.
+When a speech budget is exhausted, silent work continues.
 
 ---
 
@@ -436,196 +381,87 @@ Recommended actions:
 
 The Room may use Telegram, Discord, a War Room interface, or another transport.
 
-Transport behavior must not define constitutional authority.
+For Telegram:
 
-The Governor is authoritative even when the transport exposes native admin permissions.
-
-For Telegram specifically:
-
-- bot messages that are not naturally delivered to other bots must be relayed through the Governor or internal event bus;
-- relay delivery must preserve original sender, mission, message ID, and finality metadata;
-- relayed messages must not generate duplicate cognitive events;
-- Telegram admin permissions may provide an additional hard control, but they do not replace Governor state;
-- no bot may send directly to Telegram outside the controlled gateway.
-
-The preferred pattern is an internal event bus with selective delivery rather than blind fan-out to every agent.
+- missing bot-to-bot delivery may be solved through the Governor or internal event bus;
+- relay metadata must preserve original sender and mission;
+- relayed messages must not produce duplicate cognitive events;
+- Telegram admin permissions may add speech control;
+- no bot may publish outside the controlled communication gateway.
 
 ---
 
 ## 16. Persistence Model
 
-Minimum durable objects:
+Minimum durable communication objects:
 
 ```text
 agents
 agent_communication_state
 missions
 mission_participants
-task_owners
 communication_routes
 communication_leases
 silence_orders
 messages
 processed_transport_updates
 message_rejections
-loop_incidents
-usage_ledger
+communication_loop_incidents
 watcher_reports
 human_overrides
-system_lockdowns
+room_lockdowns
 audit_events
 resurrection_stages
 ```
 
 Governor state must survive restarts.
 
-Startup must default to the safest persisted state. If state integrity cannot be verified, ordinary agents remain silenced until Human or Chief review.
-
 ---
 
-## 17. Controlled Resurrection Procedure
+## 17. Controlled Resurrection
 
-After a communication incident, agents must be restored in this order:
+After a Room incident:
 
-### Stage 0 — Empty Room
+1. Start with an empty Room and Governor online.
+2. Restore Chief only.
+3. Restore two Watchers.
+4. Add one Lead.
+5. Verify Chief supervision and speech controls.
+6. Add a second Lead and test one bounded bridge.
+7. Add remaining Leads individually.
+8. Stress-test communication storms and Room lockdown.
 
-- Governor online.
-- Ordinary agents offline.
-- Queues inspected and quarantined.
-- Deduplication, budgets, silence, and lockdown verified.
+Silent work may continue during speech tests when authorized.
 
-### Stage 1 — Chief Only
-
-- Restore the Chief.
-- Load updated Codex and Governor controls.
-- Test mission decomposition, activation, routing, silence, restoration, closure, and lockdown in simulation.
-
-### Stage 2 — Watchers
-
-- Restore two Watchers.
-- Confirm they can observe and report but cannot execute or route.
-- Watchers assess Chief compliance.
-
-### Stage 3 — One Lead
-
-- Add one Lead.
-- Run one bounded real task.
-- Confirm continuous Chief ↔ Lead supervision.
-- Confirm the Lead cannot contact any other ordinary agent.
-
-### Stage 4 — Hard-Control Verification
-
-- Silence the Lead.
-- Confirm outbound delivery and model-trigger paths stop as designed.
-- Restore the Lead.
-- Close the mission and confirm all associated authority expires.
-
-### Stage 5 — Second Lead and Bridge
-
-- Add one additional Lead.
-- Confirm direct Lead-to-Lead communication is blocked.
-- Chief opens one bounded bridge.
-- Verify scope, budget, expiry, revocation, and audit.
-
-### Stage 6 — Progressive Expansion
-
-- Add only one additional Lead at a time.
-- Require evidence of stability before each addition.
-- Do not restore the next agent while any material failure remains.
-
-### Stage 7 — Stress Test
-
-- Test concurrent missions, conflicts, loop attempts, budget exhaustion, Chief overload, Watcher alerts, and lockdown.
-
-### Stage 8 — Certification
-
-Full operations may resume only after evidence shows:
-
-- zero uncontrolled message storms;
-- valid Chief routing;
-- continuous supervision;
-- effective silence and restoration;
-- correct Watcher access;
-- budget enforcement;
-- reliable audit logs;
-- preserved Human control.
-
-Any failed stage returns the organization to the last stable stage.
-
-Mass unsilencing, mass reconnection, and automatic replay of old queues are prohibited.
+Mass unsilencing and automatic replay of old Room messages are prohibited.
 
 ---
 
 ## 18. Acceptance Tests
 
-The Governor is not considered implemented until it passes at least:
+The Governor is not implemented until it proves:
 
-1. General Human message activates only the Chief.
-2. Chief activates exactly one Lead.
-3. Assigned Lead communicates continuously with Chief.
-4. Unassigned Lead remains observer-only.
-5. Lead-to-Lead message is blocked without a lease.
-6. Chief routes one message between Leads.
-7. Chief opens and revokes a bridge.
-8. Lease expires automatically.
-9. Hard silence blocks outbound delivery.
-10. Hard silence prevents avoidable model calls.
-11. Watcher report remains available during ordinary-agent silence.
-12. Duplicate transport update is processed once.
-13. Self-message produces no model call.
-14. Final message produces no ordinary reply.
-15. Mission closure revokes all associated routes and leases.
-16. Message budget exhaustion stops further delivery.
-17. Token or cost ceiling pauses the mission.
-18. Loop detection stops a two-agent cycle.
-19. Lockdown stops all ordinary sends immediately.
-20. Queued messages do not replay automatically after lockdown.
-21. Human override takes immediate precedence.
-22. Restart restores persisted restrictions safely.
-23. Resurrection stages cannot be skipped without Human override.
+1. General Human messages activate only the Chief operationally.
+2. Chief activates exactly one Lead for speech.
+3. Assigned Lead communicates with Chief.
+4. Unassigned Lead cannot enter the dialogue.
+5. Lead-to-Lead speech is blocked without a lease.
+6. Chief opens and revokes a bridge.
+7. Hard silence blocks Room output.
+8. Hard silence does not stop tools or reasoning.
+9. Message-rate exhaustion does not stop internal work.
+10. Duplicate updates are delivered once.
+11. Self-messages and final messages produce no reply storm.
+12. Communication-loop detection quiets the Room while mission work continues.
+13. Room Lockdown stops ordinary speech immediately.
+14. Human override takes immediate precedence.
+15. Resurrection stages cannot be skipped without Human override.
 
-Every test must produce an evidence artifact.
+Every test must prove both communication order and preserved internal work.
 
 ---
 
-## 19. Implementation Separation
+## Final Requirement
 
-This specification belongs in the public Dialogue OS repository because it defines how the constitutional law must be implemented.
-
-The following belong in the private runtime repository:
-
-- Governor source code;
-- gateway adapters;
-- Telegram or Discord tokens;
-- model-provider credentials;
-- deployment configuration;
-- environment variables;
-- private account identifiers;
-- internal logs;
-- customer or mission data;
-- infrastructure addresses;
-- production incident evidence containing private data.
-
-The public Codex defines the law and the required machine behavior. The private runtime implements it.
-
----
-
-## 20. Final Requirement
-
-Dialogue OS must not be reactivated merely because the agents are technically able to speak again.
-
-It may be reactivated only when the Governor proves that speech is:
-
-- authorized;
-- routed;
-- supervised;
-- bounded;
-- revocable;
-- observable;
-- auditable;
-- affordable;
-- and subordinate to the Human.
-
-The engine remains alive.
-
-The Governor controls the throttle.
+> The Governor controls the microphone.  
+> It does not control the mind, the tools, or the engine.
