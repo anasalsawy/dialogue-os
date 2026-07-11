@@ -1,12 +1,12 @@
 # Book XIII — The Order of the Room
 
-## Part III — Message, Loop, Budget, and Telegram Law
+## Part III — Message, Communication-Loop, Speech-Budget, and Telegram Law
 
 ## Article 8 — Message Law
 
 ### 8.1 Required Message Envelope
 
-Every operational agent message must include or resolve to:
+Every operational message must include or resolve to:
 
 ```json
 {
@@ -31,61 +31,52 @@ Every operational agent message must include or resolve to:
 
 ### 8.2 Invalid Message
 
-A message is invalid if:
+A message is invalid when:
 
-* No task ID exists for operational work.
-* The sender is not authorized.
-* The recipient is not authorized.
-* The lease is absent or expired.
-* The message has already been processed.
-* The task is closed.
-* The message has expired.
-* Hop depth is exceeded.
-* The sender is silenced.
-* The content is non-material.
-* The message is a response to the bot’s own output.
-* The same semantic content has already been delivered.
+- the sender is not authorized;
+- the recipient is not authorized;
+- a required lease is absent or expired;
+- the message was already delivered;
+- the task is closed for communication;
+- the message expired;
+- hop depth is exceeded;
+- the sender is silenced from speaking;
+- the message responds to the bot’s own output;
+- the same message was already delivered;
+- or the message violates finality.
 
-Invalid messages must be dropped before invoking the language model whenever possible.
+Invalid messages must be dropped before transport delivery whenever possible.
+
+Message rejection does not stop the sender’s internal reasoning, tools, retries, Workers, or mission.
 
 ### 8.3 Acknowledgements
 
-Routine acknowledgements must not trigger new model calls.
+Routine acknowledgements must not create Room traffic.
 
-The system may record acknowledgement internally without posting:
+The system may record them internally:
 
 ```text
 received=true
 processed=true
 ```
 
-Agents must not send:
-
-* “Understood.”
-* “Got it.”
-* “I agree.”
-* “Thanks.”
-* “Proceeding.”
-* “Good point.”
-
-unless the acknowledgement itself changes task state.
+Agents should not publish empty acknowledgements such as “Understood,” “Got it,” “Thanks,” or “Proceeding” unless the acknowledgement changes task state.
 
 ### 8.4 Status Messages
 
-A `STATUS` message is valid only when at least one field changed:
+A `STATUS` message is valid when it reports a material state change, including:
 
-* Progress percentage.
-* Phase.
-* Blocker.
-* Evidence.
-* Owner.
-* Expected completion condition.
-* Resource status.
-* Task state.
+- progress;
+- phase;
+- blocker;
+- evidence;
+- owner;
+- resource state;
+- or mission state.
+
+Agents may continue working without publishing frequent status messages.
 
 ### 8.5 Required Response Limit
-
-Every message must state whether a response is required.
 
 Default:
 
@@ -93,7 +84,7 @@ Default:
 requires_response = false
 ```
 
-A response must not be generated merely because a message was received.
+A response must not be generated merely because another bot spoke.
 
 ### 8.6 Finality Marker
 
@@ -104,125 +95,126 @@ FINAL
 NO_RESPONSE_REQUIRED
 ```
 
-must not trigger replies from any ordinary agent.
+must not trigger ordinary agent replies.
 
 ---
 
-## Article 9 — Loop Prevention
+## Article 9 — Communication-Loop Prevention
 
-### 9.1 Mandatory Controls
+### 9.1 Scope
+
+This Article governs communication loops only.
+
+It does not govern silent execution, model reasoning, tools, Workers, research, retries, browsing, coding, or long-running work.
+
+### 9.2 Mandatory Communication Controls
 
 The messaging layer MUST implement:
 
-* Telegram update deduplication.
-* Message ID deduplication.
-* Semantic duplicate detection.
-* Sender-recipient authorization.
-* Rate limiting.
-* Maximum hop depth.
-* Maximum task duration.
-* Maximum message count.
-* Maximum token budget.
-* Task closure checks.
-* Self-message rejection.
-* Retry limits.
-* Circuit breakers.
-* Emergency kill switch.
+- transport-update deduplication;
+- message-ID deduplication;
+- sender-recipient authorization;
+- communication rate limiting;
+- message-hop limits;
+- task-communication closure checks;
+- self-message rejection;
+- final-message rejection;
+- duplicate-message suppression;
+- and an emergency Room mute.
 
-### 9.2 Loop Definition
+### 9.3 Communication Loop Definition
 
-A loop is presumed when any of the following occurs:
+A communication loop exists when repeated messages create no useful new Room state, evidence, decision, or authorized work, including:
 
-* The same two agents exchange more than 4 messages without state change.
-* Three or more agents repeat the same conclusion.
-* A message returns to an earlier agent without new evidence.
-* The same task question is asked twice after being answered.
-* The same directive is repeated more than twice.
-* Agents continue speaking after final output.
-* Traffic continues without a Human message, new task event, tool result, timer event, or external state change.
+- agents replying to each other circularly;
+- repeated acknowledgements;
+- repeated conclusions;
+- self-triggered replies;
+- messages after finality;
+- or uncontrolled message volume.
 
-### 9.3 Loop Response
+Repeated silent work is not a communication loop.
 
-On loop detection:
+### 9.4 Communication Loop Response
 
-1. Stop delivery.
-2. Do not invoke additional models.
-3. Close the active lease.
-4. Silence involved agents for that task.
-5. Preserve the last 20 relevant events.
-6. Mark the task `LOOP_STOPPED`.
-7. Notify the Chief.
-8. Notify Watchers.
-9. Produce one concise Human-visible alert.
-10. Require an explicit new routing decision before resumption.
+On communication-loop detection:
 
-### 9.4 No Infinite Retries
+1. Block or mute the affected messages.
+2. Close affected communication leases when necessary.
+3. Apply task-specific speech restrictions when necessary.
+4. Preserve the relevant message evidence.
+5. Notify the Chief once.
+6. Notify Watchers once when oversight is required.
+7. Keep the underlying mission and internal work active.
+8. Allow the Chief to restore, route, or consolidate later reporting.
 
-Maximum retries for the same failed action:
+The Governor must not automatically cancel the model, tools, Workers, retries, or mission.
 
-```text
-3
-```
+### 9.5 Repeated Work
 
-After the third failure:
+No constitutional maximum applies to silent tool retries or repeated execution attempts merely because they are numerous.
 
-* Change method.
-* Escalate.
-* Reassign.
-* Pause.
-* Or close as blocked.
-
-Repeating the same action is not persistence.
+The Chief and Human may observe, advise, redirect, pause, or stop execution, but the Communication Governor may not do so automatically.
 
 ---
 
-## Article 10 — Budget and Cost Governance
+## Article 10 — Speech and Room-Traffic Budgets
 
-### 10.1 Task Budget
+### 10.1 Scope
 
-Every mission must have:
+Budgets under this Article regulate communication only.
 
-* Maximum model calls.
-* Maximum messages.
-* Maximum tokens.
-* Maximum runtime.
-* Maximum retries.
-* Maximum concurrent agents.
-* Maximum permitted cost.
+They may include:
 
-### 10.2 Global Budget
+- messages per agent;
+- messages per task;
+- messages per time window;
+- communication hops;
+- Room posting frequency;
+- and communication transport volume.
 
-The system must enforce:
+They do not include automatic limits on:
 
-* Hourly cost ceiling.
-* Daily cost ceiling.
-* Per-agent ceiling.
-* Per-task ceiling.
-* Emergency reserve.
-* Automatic lockdown threshold.
+- model calls;
+- tool calls;
+- tokens used for silent reasoning;
+- mission runtime;
+- Worker count;
+- retries;
+- browsing;
+- coding;
+- research;
+- or internal execution.
 
-### 10.3 Budget Threshold Actions
+### 10.2 Budget Exhaustion
 
-Recommended behavior:
+When a speech budget is exhausted:
 
-* 50% used: internal warning.
-* 75% used: Chief warning and reduced concurrency.
-* 90% used: stop new leases.
-* 100% used: silence non-essential agents and pause task.
-* Global ceiling reached: declare lockdown.
+- the agent continues working silently;
+- further ordinary Room messages are blocked, delayed, or consolidated;
+- Chief communication may remain available according to policy;
+- the mission remains active;
+- tools and reasoning continue.
 
-### 10.4 No Budget Bypass
+### 10.3 No Execution Consequence
 
-No agent may bypass cost controls by:
+A communication budget must never be interpreted as an execution budget.
 
-* Changing provider.
-* Using another key.
-* Spawning more Workers.
-* Splitting one task into artificial subtasks.
-* Retrying through another runtime.
-* Transferring the task to escape limits.
+The following transition is mandatory:
 
-Budget follows the task, not the agent.
+```text
+MESSAGE_BUDGET_EXHAUSTED → SILENT_WORK_CONTINUES
+```
+
+not:
+
+```text
+MESSAGE_BUDGET_EXHAUSTED → STOP_AGENT
+```
+
+### 10.4 Human and Chief Authority
+
+The Human or Chief may explicitly impose separate operational limits or stop orders when they choose. Such orders are executive decisions, not automatic Governor behavior.
 
 ---
 
@@ -232,94 +224,74 @@ Budget follows the task, not the agent.
 
 Telegram must not be treated as the sole source of task truth, memory, ownership, or permissions.
 
-Authoritative state must exist in a durable backend.
+Authoritative communication state must exist in a durable backend.
 
-### 11.2 Recommended Telegram Structure
+### 11.2 Room Structure
 
-Use one forum-enabled supergroup with topics such as:
+The Room may be implemented as a private supergroup, channel, War Room, internal event bus, or combination selected by the Human.
 
-```text
-Chief Desk
-Human Orders
-Active Missions
-Builder
-Booking
-Research
-Incidents
-Watcher Reports
-Final Reports
-System Log
-```
+Transport choice must not alter constitutional authority.
 
-### 11.3 Chief Desk
+### 11.3 Human Orders
 
-Only the following may speak in `Chief Desk`:
+Human missions are routed to the Chief unless the Human explicitly addresses another agent.
 
-* Human.
-* Chief.
-* Watchers when filing constitutional reports.
+Ordinary agents must not self-assign from general Room traffic.
 
-### 11.4 Human Orders
+### 11.4 Domain Communication
 
-Human instructions enter through `Human Orders`.
+Only the assigned Lead, Chief, authorized Workers, and currently leased participants may speak in a mission conversation.
 
-Ordinary agents may read but must not answer directly unless routed by the Chief.
+Unassigned agents may remain silent observers.
 
-### 11.5 Domain Topics
+### 11.5 Final Reports
 
-Only the assigned Lead and currently leased participants may speak in a domain topic.
-
-### 11.6 Final Reports
-
-Only final, evidence-backed reports may be posted.
-
-Final Reports must be marked:
+Final reports must be evidence-backed and marked:
 
 ```text
 FINAL
 NO_RESPONSE_REQUIRED
 ```
 
-### 11.7 System Log
+### 11.6 System Logs
 
-Bots must not cognitively respond to System Log events.
+Bots must not cognitively reply to machine logs merely because those logs appear in the Room.
 
-System Log is machine-readable audit output.
+### 11.7 Telegram Permission Limits
 
-### 11.8 Telegram Permission Limits
+Telegram administrator permissions may provide an additional speech-control layer, but application-level routing remains authoritative.
 
-Telegram administrator status alone is not sufficient governance.
+The Chief’s silence authority should be enforced by:
 
-Application-level routing must remain authoritative.
+- blocking outbound Room sends;
+- rejecting unauthorized direct messages;
+- revoking communication leases;
+- changing Telegram posting permissions where useful;
+- and preserving internal work.
 
-The Chief’s ability to silence agents should be implemented by:
+### 11.8 One Controlled Communication Gateway
 
-* Blocking outbound sends at the shared gateway.
-* Rejecting messages from muted agent IDs.
-* Disabling task delivery.
-* Removing active leases.
-* Optionally changing Telegram posting permissions where supported.
+All agent Room messages SHOULD pass through one controlled communication gateway.
 
-### 11.9 One Gateway
-
-All agent Telegram messages SHOULD pass through one controlled messaging gateway.
-
-Agents should not hold unrestricted independent Telegram send authority.
-
-The gateway must check:
+The gateway checks:
 
 ```text
-Is sender active?
-Is sender muted?
-Is task open?
-Is recipient permitted?
-Is lease valid?
-Is message within budget?
-Is this update already processed?
+Is sender allowed to speak?
+Is recipient authorized?
+Is a lease required and valid?
 Is this message a duplicate?
-Does this message require delivery?
+Is the communication path closed?
+Is the speech rate or message budget exhausted?
+Does finality prohibit a response?
 ```
 
-Only then may the message be sent.
+Only approved messages are delivered.
+
+These checks govern delivery only. They do not govern silent cognition or tooling.
 
 ---
+
+## Closing Rule
+
+> Control the microphone.  
+> Do not unplug the engine.
