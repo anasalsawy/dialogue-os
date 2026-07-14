@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dialogue-os.example/schemas/governance-state.schema.json",
+  "title": "Dialogue OS Governance State Snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agent_id", "mission_id", "communication_state", "mission_state", "execution_state", "tool_state", "worker_state", "evidence_state", "memory_state", "updated_at"],
+  "properties": {
+    "agent_id": {"type": "string"},
+    "mission_id": {"type": ["string", "null"]},
+    "communication_state": {"enum": ["OBSERVER", "ACTIVE", "COLLABORATING", "LIMITED", "SILENCED", "QUARANTINED_FROM_SPEECH", "OFFLINE_FROM_ROOM", "ROOM_LOCKDOWN"]},
+    "mission_state": {"enum": ["NONE", "ADMITTED", "ACTIVE", "WAITING", "BLOCKED", "COMPLETION_REVIEW", "COMPLETED", "FAILED_WITH_EVIDENCE", "CANCELLED", "EXPIRED"]},
+    "execution_state": {"enum": ["UNINITIALIZED", "REGISTERED", "READY", "RUNNING", "WAITING", "BLOCKED", "RUNNING_SILENTLY", "PAUSED", "QUARANTINED", "COMPLETION_REVIEW", "COMPLETED", "FAILED_WITH_EVIDENCE", "CANCELLED", "EXPIRED", "RETIRED"]},
+    "tool_state": {"enum": ["DISABLED", "SCOPED", "ENABLED", "RESTRICTED", "RECONCILIATION_REQUIRED"]},
+    "worker_state": {"enum": ["NONE", "PLANNED", "SPAWNING", "RUNNING", "WAITING", "BLOCKED", "TERMINATING", "TERMINATED"]},
+    "evidence_state": {"enum": ["NOT_REQUIRED", "MISSING", "PARTIAL", "SUFFICIENT", "REJECTED"]},
+    "memory_state": {"enum": ["UNLOADED", "LOADED", "DIRTY", "CURATION_REQUIRED", "REDACTED"]},
+    "updated_at": {"type": "string", "format": "date-time"},
+    "causation_event_id": {"type": ["string", "null"]}
+  }
+}
