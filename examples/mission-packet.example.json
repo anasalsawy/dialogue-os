@@ -1,0 +1,34 @@
+{
+  "mission_id": "M-001",
+  "objective": "Audit the Dialogue OS repository for contradictions and produce evidence-backed corrections.",
+  "accountable_owner": "lead-governance-01",
+  "priority": "HIGH",
+  "domain": "governance",
+  "constraints": [
+    "Do not publish secrets or private runtime configuration.",
+    "Preserve Human sovereignty."
+  ],
+  "required_evidence": ["commit_sha", "conformance_report"],
+  "allowed_tools": ["github.read", "github.write", "schema.validate"],
+  "side_effect_classes": ["READ_ONLY", "REVERSIBLE_EXTERNAL"],
+  "risk_level": "MODERATE",
+  "retry_policy": {
+    "max_attempts_before_review": 3,
+    "backoff": "ADAPTIVE",
+    "require_changed_hypothesis": true,
+    "reconcile_unknown_side_effects": true,
+    "expires_at": "2026-07-21T12:00:00Z"
+  },
+  "escalation_triggers": [
+    "Repository permissions denied",
+    "Normative conflict cannot be resolved by precedence"
+  ],
+  "completion_criteria": [
+    "All new schemas validate",
+    "Conformance documents are linked from the README",
+    "Changes are committed to a review branch"
+  ],
+  "expected_final_format": "MARKDOWN",
+  "watcher_required": true,
+  "created_at": "2026-07-14T12:00:00Z"
+}
