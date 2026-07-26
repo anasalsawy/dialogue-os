@@ -1,0 +1,18 @@
+# Dialogue-OS encrypted state backup oneshot (USER systemd)
+# Refuses to run unless BACKUP_AGE_RECIPIENT and BACKUP_DESTINATION are set in .env.
+
+[Unit]
+Description=Dialogue-OS encrypted state backup oneshot
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/azureuser/dialogue-os
+Environment=DIALOGUE_OS_ROOT=/home/azureuser/dialogue-os
+Environment=PATH=/home/azureuser/.local/bin:/usr/bin:/bin
+EnvironmentFile=-/home/azureuser/dialogue-os/.env
+ExecStart=/home/azureuser/dialogue-os/scripts/backup/create_encrypted_state_backup.sh
+Nice=10
+
+[Install]
+WantedBy=default.target

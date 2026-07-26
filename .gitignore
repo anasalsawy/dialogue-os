@@ -1,0 +1,46 @@
+# Secrets & env
+.env
+.env.*
+!.env.example
+.env.bak*
+.env.save*
+
+# Virtualenv / build
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+dist/
+build/
+
+# Runtime data
+data/*.sqlite3
+data/*.sqlite3-*
+data/logs/*
+!data/logs/.gitkeep
+data/canonical/*
+!data/canonical/.gitkeep
+data/bridge.lock
+*.log
+
+# Cursor local (templates live under scripts/cursor-permissions/)
+.cursor/
+!.cursor/cli.json
+
+# Local overrides
+.workspace_path
+.workspace_path.local
+.DS_Store
+
+# Backup / crypto material
+*.age
+*.tar.age
+age-key.txt
+age-identity*
+BACKUP_AGE_IDENTITY*
+
+# Editor / OS
+*.swp
+*~

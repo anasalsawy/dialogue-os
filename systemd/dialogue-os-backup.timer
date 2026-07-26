@@ -1,0 +1,21 @@
+# Dialogue-OS encrypted state backup — daily timer (USER systemd)
+# Do NOT enable until BACKUP_AGE_RECIPIENT and BACKUP_DESTINATION are verified.
+#
+# Install (still disabled):
+#   mkdir -p ~/.config/systemd/user
+#   cp systemd/dialogue-os-backup.service systemd/dialogue-os-backup.timer ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+# Enable only after dry-run success:
+#   systemctl --user enable --now dialogue-os-backup.timer
+
+[Unit]
+Description=Dialogue-OS encrypted state backup (daily)
+Requires=dialogue-os-backup.service
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=15m
+
+[Install]
+WantedBy=timers.target

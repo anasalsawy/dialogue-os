@@ -1,0 +1,27 @@
+[Unit]
+Description=Dialogue-OS Telegram↔Cursor control-plane bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=azureuser
+Group=azureuser
+WorkingDirectory=/home/azureuser/dialogue-os
+Environment=DIALOGUE_OS_ROOT=/home/azureuser/dialogue-os
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-/home/azureuser/dialogue-os/.env
+ExecStart=/home/azureuser/dialogue-os/.venv/bin/python -m dialogue_os.bridge
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillMode=mixed
+# Least privilege; no new privileges
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/home/azureuser/dialogue-os/data /home/azureuser/.cursor /home/azureuser/.local
+# Do not expose ports beyond localhost health (app binds 127.0.0.1)
+
+[Install]
+WantedBy=multi-user.target

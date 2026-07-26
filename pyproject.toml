@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dialogue-os"
+version = "0.1.0"
+description = "Dialogue-OS / Your Travel Agent multi-agent runtime"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "aiohttp>=3.11",
+  "aiosqlite>=0.21",
+  "pydantic>=2.11",
+  "pydantic-settings>=2.9",
+  "python-dotenv>=1.0",
+  "httpx>=0.28",
+  "structlog>=25.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "pytest-asyncio>=0.26", "pytest-aiohttp>=1.1"]
+
+[project.scripts]
+dialogue-os-bridge = "dialogue_os.bridge:main"
+dialogue-os-validate = "dialogue_os.scripts.validate_config:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["dialogue_os*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]

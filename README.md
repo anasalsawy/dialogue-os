@@ -1,17 +1,56 @@
-# Dialogue OS
+# Dialogue-OS / Your Travel Agent runtime
 
-Dialogue OS is a constitutional and operational framework for persistent multi-agent organizations.
+Persistent multi-agent runtime for Your Travel Agent on this VM.
 
-## One canonical file
+## Critical architecture
 
-The complete system—Constitution, agent initialization, roles, mission lifecycle, Communication Governor, Execution Governor, Room law, retries, Workers, Watchers, evidence, memory, schemas, conformance tests, Prefect mapping, roadmap, and red-line rules—is contained in one file:
+| Component | Backend |
+|-----------|---------|
+| **Chief** | **Cursor CLI** (not Hermes) |
+| Other agents | Persistent **Hermes** profiles |
+| Orchestration | Cursor control plane + optional MAF handoffs |
+| Browsing | **Stagehand/Browserbase tool only** |
 
-# [Open the complete Dialogue OS](DIALOGUE_OS.md)
+Every managed Telegram ingress goes through the persistent Cursor CLI controller first. Cursor answers as Chief, or dispatches to a Hermes profile; the reply is published through the correct bot identity.
 
-**Current version:** v0.3 — Single-File Canonical Edition  
-**Owner and creator:** Anas Alsawy  
-**Runtime status:** Private implementation in development
+See [REBUILD_CONTEXT.md](REBUILD_CONTEXT.md), [ARCHITECTURE.md](ARCHITECTURE.md), and [OPERATIONS.md](OPERATIONS.md).
 
-`DIALOGUE_OS.md` is the sole normative source. Older split documents are preserved in Git history but are no longer separate authorities.
+## Fixed workspace
 
-The separate [`LICENSE.md`](LICENSE.md) remains for legal clarity.
+```text
+DIALOGUE_OS_ROOT=/home/azureuser/dialogue-os
+```
+
+Do not move this path — Cursor session continuity depends on it.
+
+## Quick start
+
+```bash
+cd /home/azureuser/dialogue-os
+bash scripts/bootstrap.sh
+# Edit .env (chmod 600) — never commit secrets
+.venv/bin/python -m dialogue_os.scripts.validate_config
+sudo cp systemd/dialogue-os-bridge.service /etc/systemd/system/
+sudo systemctl daemon-reload
+# Start only after validation passes:
+sudo systemctl enable --now dialogue-os-bridge
+.venv/bin/python -m dialogue_os.scripts.health_check
+```
+
+## Commands (Chief bot)
+
+- `/status` — workspace, Cursor session, backends
+- `/new` — fresh Chief Cursor session
+- `/resume` — list/select stored sessions
+- `/cancel` — stop active Cursor invocation
+- `/help` — brief help
+
+## Tests
+
+```bash
+.venv/bin/pytest -q
+```
+
+## Constitution
+
+Public Dialogue OS law lives in `DIALOGUE_OS.md` (upstream canonical file). This repository adds the private YTA runtime that implements Cursor-as-Chief and Hermes agents.

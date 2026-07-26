@@ -1,0 +1,9 @@
+# Log rotation for Dialogue-OS journal / file logs
+/home/azureuser/dialogue-os/data/logs/*.log {
+    weekly
+    rotate 8
+    compress
+    missingok
+    notifempty
+    copytruncate
+}
