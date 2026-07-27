@@ -94,6 +94,16 @@ class Settings(BaseSettings):
     hermes_model: str | None = Field(default=None, alias="HERMES_MODEL")
     hermes_max_output_tokens: int = Field(default=4096, alias="HERMES_MAX_OUTPUT_TOKENS")
     hermes_timeout_seconds: int = Field(default=120, alias="HERMES_TIMEOUT_SECONDS")
+    hermes_session_scope: str = Field(default="chat", alias="HERMES_SESSION_SCOPE")
+    hermes_backend: str = Field(default="direct", alias="HERMES_BACKEND")
+    hermes_agent_api_url: str | None = Field(default=None, alias="HERMES_AGENT_API_URL")
+    hermes_agent_api_key: str | None = Field(default=None, alias="HERMES_AGENT_API_KEY")
+    hermes_agent_multiplex_profiles: bool = Field(
+        default=True, alias="HERMES_AGENT_MULTIPLEX_PROFILES"
+    )
+    hermes_agent_profile_urls: str = Field(
+        default="", alias="HERMES_AGENT_PROFILE_URLS"
+    )
 
     browserbase_api_key: str | None = Field(default=None, alias="BROWSERBASE_API_KEY")
     browserbase_project_id: str | None = Field(default=None, alias="BROWSERBASE_PROJECT_ID")
@@ -164,6 +174,8 @@ class Settings(BaseSettings):
         "hermes_base_url",
         "hermes_api_key",
         "hermes_model",
+        "hermes_agent_api_url",
+        "hermes_agent_api_key",
         "browserbase_api_key",
         "browserbase_project_id",
         "codex_model",
@@ -209,6 +221,37 @@ class Settings(BaseSettings):
             raise ValueError("CHIEF_BACKEND must be 'codex' or 'featherless'")
         return value
 
+    @field_validator("hermes_session_scope", mode="before")
+    @classmethod
+    def _hermes_session_scope(cls, v: Any) -> str:
+        value = str(v or "chat").strip().lower()
+        if value not in {"chat", "profile"}:
+            raise ValueError("HERMES_SESSION_SCOPE must be 'chat' or 'profile'")
+        return value
+
+    @field_validator("hermes_backend", mode="before")
+    @classmethod
+    def _hermes_backend(cls, v: Any) -> str:
+        value = str(v or "direct").strip().lower()
+        if value not in {"direct", "agent_api"}:
+            raise ValueError("HERMES_BACKEND must be 'direct' or 'agent_api'")
+        return value
+
+    def hermes_profile_url_map(self) -> dict[str, str]:
+        """Parse ``profile=url`` pairs without asking pydantic to decode JSON."""
+        result: dict[str, str] = {}
+        for item in self.hermes_agent_profile_urls.split(","):
+            if not item.strip():
+                continue
+            profile, separator, url = item.partition("=")
+            if not separator or not profile.strip() or not url.strip():
+                raise ValueError(
+                    "HERMES_AGENT_PROFILE_URLS must contain comma-separated "
+                    "profile=http://host:port pairs"
+                )
+            result[profile.strip()] = url.strip().rstrip("/")
+        return result
+
     def bot_token_map(self) -> dict[str, str]:
         mapping = {
             "chief": self.telegram_chief_bot_token,
@@ -233,6 +276,17 @@ class Settings(BaseSettings):
 
     def missing_for_hermes(self) -> list[str]:
         missing: list[str] = []
+        if self.hermes_backend == "agent_api":
+            if not self.hermes_agent_api_url:
+                missing.append("HERMES_AGENT_API_URL")
+            if not self.hermes_agent_api_key:
+                missing.append("HERMES_AGENT_API_KEY")
+            if (
+                not self.hermes_agent_multiplex_profiles
+                and not self.hermes_agent_profile_urls.strip()
+            ):
+                missing.append("HERMES_AGENT_PROFILE_URLS")
+            return missing
         if not self.hermes_base_url:
             missing.append("HERMES_BASE_URL")
         if not self.hermes_api_key:
