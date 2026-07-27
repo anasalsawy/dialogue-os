@@ -80,6 +80,8 @@ class BridgeService:
                     or self.settings.hermes_model
                     or ""
                 ),
+                fallback_model=self.settings.chief_featherless_fallback_model,
+                fallback_models=self.settings.chief_featherless_fallback_models,
                 max_output_tokens=self.settings.chief_featherless_max_output_tokens,
                 timeout_seconds=self.settings.codex_timeout_seconds,
             )
@@ -325,6 +327,8 @@ class BridgeService:
                 "sandbox": False,
                 "sandbox": self.codex_client.sandbox,
                 "model": getattr(self.codex_client, "model", None),
+                "fallback_model": getattr(self.codex_client, "fallback_model", None),
+                "fallback_models": getattr(self.codex_client, "fallback_models", ()),
                 "approval_mode": "unrestricted",
                 "env_sanitized": True,
             },
