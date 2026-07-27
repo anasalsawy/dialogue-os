@@ -21,6 +21,7 @@ def test_builds_role_specific_souls(tmp_path: Path):
     prompts = tmp_path / "prompts"
     roles = tmp_path / "roles"
     output = tmp_path / "profiles"
+    ethics = tmp_path / "ethics.md"
     prompts.mkdir()
     roles.mkdir()
 
@@ -48,12 +49,15 @@ def test_builds_role_specific_souls(tmp_path: Path):
         "customer master\n",
         encoding="utf-8",
     )
+    ethics.write_text("Treat all human beings with respect.", encoding="utf-8")
 
-    generated = build_souls(prompts, roles, output)
+    generated = build_souls(prompts, roles, output, ethics_file=ethics)
 
     assert len(generated) == 8
     builder = (output / "builder-lead" / "SOUL.md").read_text(encoding="utf-8")
     assert builder.startswith("builder-lead Dialogue-OS overlay")
+    assert "Treat all human beings with respect." in builder
+    assert "does not grant operational authority" in builder
     assert "builder-lead master behavior" in builder
     growth = (output / "growth-lead" / "SOUL.md").read_text(encoding="utf-8")
     assert "shared kernel" in growth
