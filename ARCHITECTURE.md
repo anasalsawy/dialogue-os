@@ -2,22 +2,22 @@
 
 ## Department offices (target model)
 
-Dialogue-OS is **not** a universal Cursor-first router. It is a set of separate
+Dialogue-OS is **not** a universal Codex-first router. It is a set of separate
 Telegram department offices. Each office is one group containing:
 
 - Anas — human owner/operator
-- Chief — Cursor-backed manager, present in **every** office
+- Chief — Codex-backed manager, present in **every** office
 - exactly **one** specialist — Hermes-backed, present only in its own office
 
 One specialist per office is what prevents the "bot zoo".
 
 ```text
-Anas → Chief DM (Cursor session)
+Anas → Chief DM (Codex session)
     → Chief picks the department
     → Chief posts the assignment in that department's office
     → the specialist receives it over its OWN Telegram connection
     → the specialist replies in the office under its own bot identity
-    → Chief reviews via Cursor, asks questions, requires evidence
+    → Chief reviews via Codex, asks questions, requires evidence
     → supervised back-and-forth until Chief VERIFIES completion
     → Chief reports to Anas; optionally publishes a final report to canonical
 ```
@@ -29,9 +29,9 @@ every specialist response.
 
 | Surface | Backend |
 |---------|---------|
-| Chief DM | persistent Cursor CLI session |
+| Chief DM | persistent Codex CLI session |
 | Specialist DM | that specialist's persistent Hermes session, directly |
-| Office message received by Chief | Cursor |
+| Office message received by Chief | Codex |
 | Office message received by a specialist | that specialist's Hermes profile |
 
 Stagehand/Browserbase is the Browsing agent's browser tool only. MAF may track
@@ -47,13 +47,13 @@ conversation.
 | Mission lifecycle + supervision trail (`offices/missions.py`) | implemented |
 | Loop protection primitives (`offices/loop_guard.py`) | implemented |
 | Service/empty-message filtering in ingress | implemented |
-| **Office-aware routing** (specialist ingress → Hermes directly, not via Cursor) | **not yet — `bridge.on_update` still routes all ingress through Cursor** |
+| **Office-aware routing** (specialist ingress → Hermes directly, not via Codex) | **not yet — `bridge.on_update` still routes all ingress through Codex** |
 | Independent specialist consumers | **not yet** |
 | Chief assignment/supervision loop inside offices | implemented (`offices/assign.py` + `offices/supervisor.py`) — live multi-office drill still required for proof |
 | Governor relay for bot→bot transport gaps | **not yet** |
 
 Until office-aware routing lands, `ARCHITECTURE.md` describes the target and
-`bridge.py` still implements the old Cursor-first path.
+`bridge.py` still implements the old Codex-first path.
 
 ## Chief assignment
 
@@ -79,7 +79,7 @@ logs, blocker, next expected action, completion evidence and verification
 status — plus `next_check_at`.
 
 Because the next supervision time lives in SQLite rather than in a sleeping
-Cursor invocation, supervision resumes correctly after a bridge restart or VM
+Codex invocation, supervision resumes correctly after a bridge restart or VM
 reboot.
 
 ```text
@@ -87,7 +87,7 @@ Chief assigns in the office        → ASSIGNED, supervision starts
 specialist acknowledges + plan     → ACKNOWLEDGED
 specialist heartbeats              → WORKING (action, tool, progress, blocker, next)
 supervisor probes deterministically→ /proc status, exit codes, logs, artifacts
-something meaningful changed       → Cursor invoked; Chief posts in the office
+something meaningful changed       → Codex invoked; Chief posts in the office
 specialist says "done"             → COMPLETION_CLAIMED (a claim, nothing more)
 Chief inspects evidence            → VERIFYING → VERIFIED_COMPLETED
 ```
@@ -101,21 +101,20 @@ Only Chief may reach `VERIFIED_COMPLETED`, and only via an explicit
 `VERDICT: VERIFIED` line after independently inspecting evidence. Absent a
 verdict the mission stays in the gate — a missing verdict never becomes a pass.
 
-## Cursor execution policy
+## Codex execution policy
 
-Headless Cursor runs `--print --trust --sandbox enabled` in default **Agent**
-mode. `--force`, `--yolo` and unrestricted approval mode are never used;
-execution authority comes from `.cursor/cli.json` allow/deny rules. The child
-process gets an allowlisted environment containing no bridge secrets. See
-`OPERATIONS.md` for details.
+Headless Chief runs `codex exec --json --sandbox workspace-write` in the fixed
+workspace and resumes the persisted Codex thread ID. Dangerous sandbox-bypass
+flags are not used. The child receives an allowlisted environment containing
+no bridge secrets. See `OPERATIONS.md` for details.
 
-**Chief is Cursor itself.** A Hermes profile must never become Chief.
+**Chief is Codex itself.** A Hermes profile must never become Chief.
 
 ## Agents
 
 | agent_id | Backend | Hermes profile |
 |----------|---------|----------------|
-| chief | Cursor CLI | — |
+| chief | Codex CLI | — |
 | builder | Hermes | builder-lead |
 | researcher | Hermes | research-lead |
 | operations | Hermes | operations-lead |
@@ -148,13 +147,13 @@ pathological loops, not normal supervised work.
 A specialist claiming completion reaches **REVIEW** only. Only Chief's explicit
 verification moves a mission to **COMPLETED**; a rejected claim returns it to
 WORKING. Every mission records department, office chat ID, specialist, Chief's
-Cursor session, the specialist's Hermes session, the assignment, progress
+Codex session, the specialist's Hermes session, the assignment, progress
 reports, tool evidence, blockers, Chief's instructions, the completion claim,
 Chief's verification and the final report.
 
 ## Persistence (SQLite WAL)
 
-Agents, bot metadata, chat→session maps, Cursor session IDs, Hermes session histories, processed updates, tasks/handoffs, canonical events, tool runs, watcher alerts/overrides, errors, config metadata (no secrets).
+Agents, bot metadata, chat→session maps, Codex session IDs, Hermes session histories, processed updates, tasks/handoffs, canonical events, tool runs, watcher alerts/overrides, errors, config metadata (no secrets).
 
 Migration `002_offices_missions.sql` adds `offices`, `missions`,
 `mission_events` and `office_message_seen`. It is additive; existing tables are
@@ -169,7 +168,7 @@ DMs are never silently copied there.
 
 ## MAF
 
-Microsoft Agent Framework helpers provide selection hints, durable handoffs, and temporary group workflow records. They do **not** replace Cursor or Hermes as the visible conversational backend.
+Microsoft Agent Framework helpers provide selection hints, durable handoffs, and temporary group workflow records. They do **not** replace Codex or Hermes as the visible conversational backend.
 
 ## Browser
 

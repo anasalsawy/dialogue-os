@@ -1,6 +1,6 @@
 """Deterministic mission probes — cheap checks that never call an LLM.
 
-The supervisor runs these on every tick. Cursor is only invoked when a probe
+The supervisor runs these on every tick. Codex is only invoked when a probe
 (or a specialist message) shows something worth a decision: a stall, a dead
 process, a new blocker, a completion claim, or an explicit mention.
 """
@@ -94,7 +94,7 @@ def state_fingerprint(values: dict[str, Any]) -> str:
     """Stable hash of the observable mission state.
 
     An unchanged fingerprint means nothing happened since the last inspection,
-    so the supervisor can skip the Cursor call entirely.
+    so the supervisor can skip the Codex call entirely.
     """
     blob = json.dumps(values, sort_keys=True, default=str)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:32]

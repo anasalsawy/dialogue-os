@@ -8,7 +8,7 @@ completion claim, or an explicit request.
 
 Two rules shape the design:
 
-* No Cursor invocation is left sleeping. The next supervision time lives in
+* No Codex invocation is left sleeping. The next supervision time lives in
   SQLite, so a bridge restart or VM reboot resumes the loop on schedule.
 * Nothing is ever inferred into existence. If a probe cannot show progress,
   the mission does not look like it progressed.
@@ -49,7 +49,7 @@ from dialogue_os.util.redact import redact_text
 
 log = get_logger("offices.supervisor")
 
-# Finding kinds — each one is a reason to spend a Cursor invocation.
+# Finding kinds — each one is a reason to spend a Codex invocation.
 MISSING_ACK = "missing_acknowledgement"
 STALE_HEARTBEAT = "stale_heartbeat"
 PROCESS_EXITED = "process_exited"
@@ -314,7 +314,7 @@ class MissionSupervisor:
         outcome = SupervisionOutcome(mission_id, findings=findings)
 
         if not findings and unchanged and not force:
-            # Nothing changed and nothing is wrong: do not spend a Cursor call.
+            # Nothing changed and nothing is wrong: do not spend a Codex call.
             state = await self.supervision.update(
                 mission_id,
                 last_checked_at=now,

@@ -6,12 +6,12 @@ Persistent multi-agent runtime for Your Travel Agent on this VM.
 
 | Component | Backend |
 |-----------|---------|
-| **Chief** | **Cursor CLI** (not Hermes) |
+| **Chief** | **Codex CLI** (not Hermes) |
 | Other agents | Persistent **Hermes** profiles |
-| Orchestration | Cursor control plane + optional MAF handoffs |
+| Orchestration | Codex control plane + optional MAF handoffs |
 | Browsing | **Stagehand/Browserbase tool only** |
 
-Every managed Telegram ingress goes through the persistent Cursor CLI controller first. Cursor answers as Chief, or dispatches to a Hermes profile; the reply is published through the correct bot identity.
+Every managed Telegram ingress goes through the persistent Codex CLI controller first. Codex answers as Chief, or dispatches to a Hermes profile; the reply is published through the correct bot identity.
 
 See [REBUILD_CONTEXT.md](REBUILD_CONTEXT.md), [ARCHITECTURE.md](ARCHITECTURE.md), and [OPERATIONS.md](OPERATIONS.md).
 
@@ -21,7 +21,7 @@ See [REBUILD_CONTEXT.md](REBUILD_CONTEXT.md), [ARCHITECTURE.md](ARCHITECTURE.md)
 DIALOGUE_OS_ROOT=/home/azureuser/dialogue-os
 ```
 
-Do not move this path — Cursor session continuity depends on it.
+Do not move this path — Codex session continuity depends on it.
 
 ## Quick start
 
@@ -39,10 +39,10 @@ sudo systemctl enable --now dialogue-os-bridge
 
 ## Commands (Chief bot)
 
-- `/status` — workspace, Cursor session, backends
-- `/new` — fresh Chief Cursor session
+- `/status` — workspace, Codex session, backends
+- `/new` — fresh Chief Codex session
 - `/resume` — list/select stored sessions
-- `/cancel` — stop active Cursor invocation
+- `/cancel` — stop active Codex invocation
 - `/help` — brief help
 
 ## Tests
@@ -53,4 +53,4 @@ sudo systemctl enable --now dialogue-os-bridge
 
 ## Constitution
 
-Public Dialogue OS law lives in `DIALOGUE_OS.md` (upstream canonical file). This repository adds the private YTA runtime that implements Cursor-as-Chief and Hermes agents.
+Public Dialogue OS law lives in `DIALOGUE_OS.md` (upstream canonical file). This repository adds the private YTA runtime that implements Codex-as-Chief and Hermes agents.

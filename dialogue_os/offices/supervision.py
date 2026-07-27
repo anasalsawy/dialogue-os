@@ -1,7 +1,7 @@
 """Durable supervision state for active missions.
 
 Everything the supervisor needs to reason about a mission lives in SQLite,
-including `next_check_at`. No Cursor invocation is ever left sleeping to hold a
+including `next_check_at`. No Codex invocation is ever left sleeping to hold a
 timer, so supervision resumes correctly after a bridge restart or VM reboot.
 """
 

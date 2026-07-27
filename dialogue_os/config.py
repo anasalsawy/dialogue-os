@@ -51,15 +51,12 @@ class Settings(BaseSettings):
         default=None, alias="TELEGRAM_WATCHER_BETA_BOT_TOKEN"
     )
 
-    cursor_cli_bin: str = Field(default="agent", alias="CURSOR_CLI_BIN")
-    cursor_model: str | None = Field(default=None, alias="CURSOR_MODEL")
-    cursor_timeout_seconds: int = Field(default=600, alias="CURSOR_TIMEOUT_SECONDS")
-    cursor_control_session_key: str = Field(
-        default="primary", alias="CURSOR_CONTROL_SESSION_KEY"
+    codex_cli_bin: str = Field(default="codex", alias="CODEX_CLI_BIN")
+    codex_model: str | None = Field(default=None, alias="CODEX_MODEL")
+    codex_timeout_seconds: int = Field(default=600, alias="CODEX_TIMEOUT_SECONDS")
+    codex_control_session_key: str = Field(
+        default="primary", alias="CODEX_CONTROL_SESSION_KEY"
     )
-    cursor_api_key: str | None = Field(default=None, alias="CURSOR_API_KEY")
-    # None = auto-detect --force vs --yolo from `agent --help` (never both).
-    cursor_force_flag: str | None = Field(default=None, alias="CURSOR_FORCE_FLAG")
 
     hermes_base_url: str | None = Field(default=None, alias="HERMES_BASE_URL")
     hermes_api_key: str | None = Field(default=None, alias="HERMES_API_KEY")
@@ -97,6 +94,11 @@ class Settings(BaseSettings):
 
     health_bind: str = Field(default="127.0.0.1", alias="HEALTH_BIND")
     health_port: int = Field(default=8787, alias="HEALTH_PORT")
+    war_room_api_token: str | None = Field(default=None, alias="WAR_ROOM_API_TOKEN")
+    war_room_allowed_origins: tuple[str, ...] = Field(
+        default=("https://yta-war-room-live.masryalsawy.chatgpt.site",),
+        alias="WAR_ROOM_ALLOWED_ORIGINS",
+    )
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     service_user: str = Field(default="azureuser", alias="SERVICE_USER")
     bot_to_bot_chatter: bool = Field(default=False, alias="BOT_TO_BOT_CHATTER")
@@ -133,9 +135,8 @@ class Settings(BaseSettings):
         "hermes_model",
         "browserbase_api_key",
         "browserbase_project_id",
-        "cursor_model",
-        "cursor_api_key",
-        "cursor_force_flag",
+        "codex_model",
+        "war_room_api_token",
         mode="before",
     )
     @classmethod
@@ -144,17 +145,14 @@ class Settings(BaseSettings):
             return None
         return v
 
-    @field_validator("cursor_force_flag", mode="before")
+    @field_validator("war_room_allowed_origins", mode="before")
     @classmethod
-    def _force_flag(cls, v: Any) -> str | None:
-        if v is None or v == "":
-            return None
-        val = str(v).strip().lower()
-        if val in ("force", "--force"):
-            return "--force"
-        if val in ("yolo", "--yolo"):
-            return "--yolo"
-        raise ValueError("CURSOR_FORCE_FLAG must be '--force', '--yolo', or empty (auto-detect)")
+    def _origins(cls, v: Any) -> tuple[str, ...]:
+        if not v:
+            return ()
+        if isinstance(v, str):
+            return tuple(origin.strip().rstrip("/") for origin in v.split(",") if origin.strip())
+        return tuple(str(origin).strip().rstrip("/") for origin in v if str(origin).strip())
 
     def bot_token_map(self) -> dict[str, str]:
         mapping = {

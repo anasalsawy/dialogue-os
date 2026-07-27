@@ -6,14 +6,14 @@ Previous rebuild attempts incorrectly treated **Chief as a Hermes profile**. Tha
 
 ## Correct model (department offices)
 
-Dialogue-OS is **not** a universal Cursor-first router for every bot reply. It is a set of Telegram **department offices**:
+Dialogue-OS is **not** a universal Codex-first router for every bot reply. It is a set of Telegram **department offices**:
 
 - **Anas** — human owner (`TELEGRAM_OWNER_ID`)
-- **Chief** — Cursor CLI manager/supervisor, present in every office
+- **Chief** — Codex CLI manager/supervisor, present in every office
 - **Exactly one specialist** — Hermes-backed, only in its own office
 
 ```text
-Anas → Chief DM (Cursor)
+Anas → Chief DM (Codex)
   → Chief decides breakdown and assignments
   → Chief posts each unit into the matching office
   → Specialist receives on its own Telegram connection / Hermes profile
@@ -23,7 +23,7 @@ Anas → Chief DM (Cursor)
 
 ## Backends (binding)
 
-1. **Chief = Cursor CLI** — never a Hermes profile named Chief.
+1. **Chief = Codex CLI** — never a Hermes profile named Chief.
 2. **Other agents = persistent Hermes profiles** — personality/memory under `hermes_profiles/`.
 3. **MAF** — optional orchestration bookkeeping only; not the visible voice.
 4. **Stagehand / Browserbase** — browser **tool** for the browsing specialist only.
@@ -38,7 +38,7 @@ Session continuity depends on keeping this absolute path stable on a given VM.
 
 ## Frozen Azure subscription
 
-Do not route LLMs through Azure. `AZURE_LLM_DISABLED=true`. Chief uses Cursor. Specialists use `HERMES_*` only.
+Do not route LLMs through Azure. `AZURE_LLM_DISABLED=true`. Chief uses Codex. Specialists use `HERMES_*` only.
 
 ## This DigitalOcean checkpoint
 

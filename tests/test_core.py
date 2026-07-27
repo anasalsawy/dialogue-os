@@ -178,7 +178,7 @@ async def test_on_cancel_update_immediate(store: Store):
     assert elapsed < 0.5
     assert await store.is_update_processed("chief", 99)
     assert cancel_order == ["cancel", "send"]
-    assert sent == [(42, "Cancelled active Cursor invocation.", 7)]
+    assert sent == [(42, "Cancelled active Codex invocation.", 7)]
 
 
 def test_parse_control_decision_json():

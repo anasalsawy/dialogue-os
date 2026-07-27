@@ -1,4 +1,4 @@
-"""Main Telegram bridge — all managed bots ingress through Cursor control plane."""
+"""Main Telegram bridge — managed orchestration uses Codex as Chief."""
 
 from __future__ import annotations
 
@@ -17,9 +17,9 @@ from dialogue_os.agents.registry import AgentRegistry
 from dialogue_os.browser.stagehand import BrowserTool
 from dialogue_os.channel.canonical import CanonicalChannel
 from dialogue_os.config import Settings, get_settings
-from dialogue_os.cursor.client import CursorClient
-from dialogue_os.cursor.control import ControlPlane, new_event_id
-from dialogue_os.cursor.sessions import CursorSessionManager
+from dialogue_os.codex.client import CodexClient
+from dialogue_os.codex.control import ControlPlane, new_event_id
+from dialogue_os.codex.sessions import CodexSessionManager
 from dialogue_os.db.store import Store
 from dialogue_os.hermes.client import HermesClient
 from dialogue_os.maf.orchestration import Orchestrator
@@ -42,6 +42,7 @@ from dialogue_os.telegram.api import TelegramBot, TypingKeepalive
 from dialogue_os.util.logging import configure_logging, get_logger
 from dialogue_os.util.redact import redact_text
 from dialogue_os.watchers.service import WatcherService
+from dialogue_os.web_api import install_war_room_api
 
 log = get_logger("bridge")
 
@@ -51,20 +52,27 @@ LOCK_PATH = Path("/home/azureuser/dialogue-os/data/bridge.lock")
 
 
 class BridgeService:
+    @property
+    def cursor_client(self):
+        """Temporary compatibility alias for extensions during the Codex migration."""
+        return self.codex_client
+
+    @cursor_client.setter
+    def cursor_client(self, value):
+        self.codex_client = value
+
     def __init__(self, settings: Settings | None = None):
         self.settings = settings or get_settings()
         self.store = Store(self.settings.database_path)
         self.registry = AgentRegistry(self.store, self.settings)
-        self.cursor_client = CursorClient(
+        self.codex_client = CodexClient(
             workspace=self.settings.dialogue_os_root,
-            cli_bin=self.settings.cursor_cli_bin,
-            model=self.settings.cursor_model,
-            timeout_seconds=self.settings.cursor_timeout_seconds,
-            api_key=self.settings.cursor_api_key,
-            force_flag=self.settings.cursor_force_flag,
+            cli_bin=self.settings.codex_cli_bin,
+            model=self.settings.codex_model,
+            timeout_seconds=self.settings.codex_timeout_seconds,
         )
-        self.sessions = CursorSessionManager(
-            self.store, self.cursor_client, self.settings.cursor_control_session_key
+        self.sessions = CodexSessionManager(
+            self.store, self.codex_client, self.settings.codex_control_session_key
         )
         self.control = ControlPlane(self.sessions, self.store)
         self.orchestrator = Orchestrator(self.store)
@@ -130,12 +138,12 @@ class BridgeService:
         )
         self.watchers = WatcherService(self.store, self.canonical)
 
-        # Ensure primary Cursor session exists early
+        # Ensure primary Codex session exists early
         try:
             sid = await self.sessions.ensure_primary()
-            log.info("cursor_primary_session", session_id=sid)
+            log.info("codex_primary_session", session_id=sid)
         except Exception as e:
-            log.error("cursor_session_init_failed", error=redact_text(str(e)))
+            log.error("codex_session_init_failed", error=redact_text(str(e)))
 
         await self._start_health()
 
@@ -200,7 +208,7 @@ class BridgeService:
         )
 
     async def on_cancel_update(self, bot: TelegramBot, update: dict) -> None:
-        """Fast-path /cancel: bypass the worker queue and kill Cursor now.
+        """Fast-path /cancel: bypass the worker queue and kill Codex now.
 
         Invoked from TelegramBot.poll_forever before the update is enqueued, so
         a long-running Chief turn cannot block cancellation.
@@ -210,7 +218,7 @@ class BridgeService:
         event_id = new_event_id()
         # Idempotent: if the worker already saw this update, do not double-reply.
         if await self.store.is_update_processed(bot_key, update_id):
-            cancelled = await self.cursor_client.cancel()
+            cancelled = await self.codex_client.cancel()
             log.info("cancel_fast_path_duplicate", bot=bot_key, killed=cancelled)
             return
         await self.store.mark_update_processed(bot_key, update_id, event_id)
@@ -220,14 +228,14 @@ class BridgeService:
         chat_id = chat.get("id")
         message_id = message.get("message_id")
 
-        cancelled = await self.cursor_client.cancel()
+        cancelled = await self.codex_client.cancel()
         log.info("cancel_fast_path", bot=bot_key, killed=cancelled, chat_id=chat_id)
         if chat_id is None:
             return
         text = (
-            "Cancelled active Cursor invocation."
+            "Cancelled active Codex invocation."
             if cancelled
-            else "No active Cursor process."
+            else "No active Codex process."
         )
         try:
             await self._send(bot, chat_id, text, reply_to=message_id)
@@ -256,6 +264,10 @@ class BridgeService:
         app = web.Application()
         app.router.add_get("/health", self._health_handler)
         app.router.add_get("/status", self._status_handler)
+        if self.settings.war_room_api_token:
+            install_war_room_api(app, self)
+        else:
+            log.warning("war_room_api_disabled", missing="WAR_ROOM_API_TOKEN")
         self._health_runner = web.AppRunner(app)
         await self._health_runner.setup()
         site = web.TCPSite(
@@ -275,20 +287,20 @@ class BridgeService:
         return web.json_response(await self.status_dict())
 
     async def status_dict(self) -> dict[str, Any]:
-        cursor_sid = await self.sessions.get_primary()
+        codex_sid = await self.sessions.get_primary()
         agents = await self.registry.known_agent_summaries()
         return {
             "ok": True,
             "uptime_seconds": round(time.time() - self._started_at, 1),
             "dialogue_os_root": str(self.settings.dialogue_os_root),
             "cursor": {
-                "bin": self.settings.cursor_cli_bin,
-                "model": self.settings.cursor_model or "default/auto",
-                "session_id": cursor_sid,
-                "backend": "cursor_cli",
+                "bin": self.settings.codex_cli_bin,
+                "model": self.settings.codex_model or "default/auto",
+                "session_id": codex_sid,
+                "backend": "codex_cli",
                 "mode": "agent (default)",
                 "sandbox": False,
-                "force_flag": self.cursor_client.resolve_force_flag(),
+                "sandbox": self.codex_client.sandbox,
                 "approval_mode": "unrestricted",
                 "env_sanitized": True,
             },
@@ -315,7 +327,19 @@ class BridgeService:
             "open_missions": len(await self.missions.list_open()),
             "azure_llm_disabled": self.settings.azure_llm_disabled,
             "canonical_channel_id": self.settings.telegram_canonical_channel_id,
+            "war_room_api": {
+                "enabled": bool(self.settings.war_room_api_token),
+                "allowed_origins": list(self.settings.war_room_allowed_origins),
+            },
         }
+
+    @staticmethod
+    def _strip_assignments_for_api(text: str):
+        return parse_and_strip_assignments(text)
+
+    @staticmethod
+    def new_event_id() -> str:
+        return new_event_id()
 
     async def stop(self) -> None:
         self._stopping = True
@@ -467,7 +491,7 @@ class BridgeService:
                 if destination == "chief":
                     if not admin_authorized and not from_is_bot:
                         # Non-owner humans talking to Chief: still answer, but
-                        # Cursor is told they may not authorize admin work.
+                        # Codex is told they may not authorize admin work.
                         pass
                     decision = await self.control.chief_direct(
                         await self._chief_prompt_with_auth_boundary(text, admin_authorized)
@@ -482,7 +506,7 @@ class BridgeService:
                     await self._execute_decision(decision, event, reply_to=message_id)
                     return
 
-                # Specialist DM → Hermes directly (never through Chief/Cursor)
+                # Specialist DM → Hermes directly (never through Chief/Codex)
                 await self._specialist_direct_reply(
                     bot=bot,
                     chat_id=chat_id,
@@ -733,7 +757,7 @@ class BridgeService:
                 telegram_message_id=event.get("message_id"),
             )
             # Under supervision, the supervisor decides when a specialist
-            # message is worth a Cursor invocation. Routine heartbeats are
+            # message is worth a Codex invocation. Routine heartbeats are
             # recorded deterministically instead of waking Chief every time.
             if self.supervisor:
                 await self.supervisor.on_specialist_message(
@@ -990,10 +1014,10 @@ class BridgeService:
                 bot,
                 chat_id,
                 "Commands:\n"
-                "/status — service, workspace, Cursor session, backends\n"
-                "/new — start a fresh Chief Cursor session\n"
-                "/resume — list or select stored Cursor sessions\n"
-                "/cancel — stop the active Cursor invocation\n"
+                "/status — service, workspace, Codex session, backends\n"
+                "/new — start a fresh Chief Codex session\n"
+                "/resume — list or select stored Codex sessions\n"
+                "/cancel — stop the active Codex invocation\n"
                 "/assign <department> <brief> — create a mission and post it (owner only)\n"
                 "/register_office <department> — bind this group as a department office (owner only)\n"
                 "/unregister_office <department> — deactivate an office (owner only)\n"
@@ -1031,19 +1055,19 @@ class BridgeService:
         if command == "new" and bot.agent_id == "chief":
             async with TypingKeepalive(bot, chat_id):
                 sid = await self.sessions.rotate_primary()
-            await self._send(bot, chat_id, f"New Chief Cursor session started.\nsession_id: {sid}")
+            await self._send(bot, chat_id, f"New Chief Codex session started.\nsession_id: {sid}")
             if self.canonical:
                 await self.canonical.broadcast(
                     agent_id="chief",
                     event_type="session_rotated",
-                    summary="Chief Cursor session rotated via /new",
+                    summary="Chief Codex session rotated via /new",
                     publish_telegram=False,
                 )
             return True
         if command == "resume" and bot.agent_id == "chief":
             sessions = await self.sessions.list_sessions()
             if not arg:
-                lines = ["Stored Cursor sessions:"]
+                lines = ["Stored Codex sessions:"]
                 for s in sessions[:20]:
                     lines.append(f"- {s['session_key']}: {s['session_id']}")
                 lines.append("Use /resume <session_key> to activate.")
@@ -1056,11 +1080,11 @@ class BridgeService:
                 await self._send(bot, chat_id, f"Unknown session key: {arg}")
             return True
         if command == "cancel":
-            cancelled = await self.cursor_client.cancel()
+            cancelled = await self.codex_client.cancel()
             await self._send(
                 bot,
                 chat_id,
-                "Cancelled active Cursor invocation." if cancelled else "No active Cursor process.",
+                "Cancelled active Codex invocation." if cancelled else "No active Codex process.",
             )
             return True
         return False
