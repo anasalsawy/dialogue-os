@@ -43,6 +43,17 @@ descriptions=(
 
 mkdir -p "${HERMES_ROOT}/profiles"
 
+# Build each profile's SOUL.md from the canonical master prompts. Pin the
+# prompts revision so production behavior cannot drift on an unreviewed push.
+prompt_checkout="$(mktemp -d)"
+trap 'rm -rf "${prompt_checkout}"' EXIT
+git clone --quiet https://github.com/anasalsawy/prompts.git "${prompt_checkout}"
+git -C "${prompt_checkout}" checkout --quiet 18bbcf6df670cefcdd6c6b45a759bee5ed08de6c
+python3 "${PROJECT_ROOT}/scripts/build_hermes_souls.py" \
+  --prompt-repo "${prompt_checkout}" \
+  --role-dir "${PROJECT_ROOT}/hermes_profiles" \
+  --destination "${HERMES_ROOT}/profiles"
+
 for index in "${!profiles[@]}"; do
   profile="${profiles[$index]}"
   profile_dir="${HERMES_ROOT}/profiles/${profile}"
@@ -53,9 +64,7 @@ for index in "${!profiles[@]}"; do
       --description "${descriptions[$index]}" --no-alias
   fi
 
-  install -m 0600 \
-    "${PROJECT_ROOT}/hermes_profiles/${profile}.md" \
-    "${profile_dir}/SOUL.md"
+  chmod 0600 "${profile_dir}/SOUL.md"
 
   PROFILE_DIR="${profile_dir}" PROFILE_PORT="${port}" PROFILE_KEY="${RUNTIME_KEY}" \
     python3 - <<'PY'
