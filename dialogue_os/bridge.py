@@ -13,7 +13,7 @@ from typing import Any
 
 from aiohttp import web
 
-from dialogue_os.agents.registry import AgentRegistry
+from dialogue_os.agents.registry import AGENT_DEFS, AgentRegistry
 from dialogue_os.browser.stagehand import BrowserTool
 from dialogue_os.channel.canonical import CanonicalChannel
 from dialogue_os.config import Settings, get_settings
@@ -22,6 +22,7 @@ from dialogue_os.codex.control import ControlPlane, new_event_id
 from dialogue_os.codex.sessions import CodexSessionManager
 from dialogue_os.db.store import Store
 from dialogue_os.hermes.client import HermesClient
+from dialogue_os.hermes.agent_client import HermesAgentClient
 from dialogue_os.featherless.chief import FeatherlessChiefClient
 from dialogue_os.maf.orchestration import Orchestrator
 from dialogue_os.offices.assign import (
@@ -116,7 +117,7 @@ class BridgeService:
         self.supervision = SupervisionStore(self.store)
         self.loop_guard = LoopGuard(self.store, self.missions)
         self.bots: dict[str, TelegramBot] = {}
-        self.hermes: HermesClient | None = None
+        self.hermes: HermesClient | HermesAgentClient | None = None
         self.canonical: CanonicalChannel | None = None
         self.watchers: WatcherService | None = None
         self.browser: BrowserTool | None = None
@@ -140,24 +141,51 @@ class BridgeService:
         # Hermes optional until configured
         missing_hermes = self.settings.missing_for_hermes()
         if not missing_hermes:
-            hermes_model = (
-                self.settings.uncensored_primary_model
-                if self.settings.uncensored_fleet_mode
-                else (self.settings.hermes_model or "")
-            )
-            self.hermes = HermesClient(
-                base_url=self.settings.hermes_base_url or "",
-                api_key=self.settings.hermes_api_key or "",
-                model=hermes_model,
-                store=self.store,
-                max_output_tokens=self.settings.hermes_max_output_tokens,
-                timeout_seconds=self.settings.hermes_timeout_seconds,
-                fallback_models=(
-                    self.settings.uncensored_fallback_models
+            if self.settings.hermes_backend == "agent_api":
+                self.hermes = HermesAgentClient(
+                    base_url=self.settings.hermes_agent_api_url or "",
+                    api_key=self.settings.hermes_agent_api_key or "",
+                    store=self.store,
+                    timeout_seconds=self.settings.hermes_timeout_seconds,
+                    session_scope=self.settings.hermes_session_scope,
+                    multiplex_profiles=self.settings.hermes_agent_multiplex_profiles,
+                    profile_urls=self.settings.hermes_profile_url_map(),
+                )
+                profiles = tuple(
+                    sorted(
+                        {
+                            item["hermes_profile"]
+                            for item in AGENT_DEFS
+                            if item.get("hermes_profile")
+                        }
+                    )
+                )
+                runtime = await self.hermes.assert_ready(profiles)
+                log.info(
+                    "hermes_agent_runtime_ready",
+                    profiles=len(runtime),
+                    tools={key: len(value["tools"]) for key, value in runtime.items()},
+                )
+            else:
+                hermes_model = (
+                    self.settings.uncensored_primary_model
                     if self.settings.uncensored_fleet_mode
-                    else ()
-                ),
-            )
+                    else (self.settings.hermes_model or "")
+                )
+                self.hermes = HermesClient(
+                    base_url=self.settings.hermes_base_url or "",
+                    api_key=self.settings.hermes_api_key or "",
+                    model=hermes_model,
+                    store=self.store,
+                    max_output_tokens=self.settings.hermes_max_output_tokens,
+                    timeout_seconds=self.settings.hermes_timeout_seconds,
+                    session_scope=self.settings.hermes_session_scope,
+                    fallback_models=(
+                        self.settings.uncensored_fallback_models
+                        if self.settings.uncensored_fleet_mode
+                        else ()
+                    ),
+                )
         else:
             log.warning("hermes_not_configured", missing=missing_hermes)
 
