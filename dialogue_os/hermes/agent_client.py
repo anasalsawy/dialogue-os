@@ -98,10 +98,18 @@ class HermesAgentClient:
                         )
                     toolsets = await client.get(f"{base}/v1/toolsets", headers=headers)
                     toolsets.raise_for_status()
+                    toolset_data = toolsets.json()
+                    if isinstance(toolset_data, dict):
+                        toolset_data = toolset_data.get("toolsets", [])
+                    if not isinstance(toolset_data, list):
+                        raise RuntimeError(
+                            f"{profile} Hermes runtime returned malformed toolsets"
+                        )
                     enabled_tools = sorted(
                         {
                             tool
-                            for item in toolsets.json()
+                            for item in toolset_data
+                            if isinstance(item, dict)
                             if item.get("enabled") and item.get("configured")
                             for tool in item.get("tools", [])
                         }
