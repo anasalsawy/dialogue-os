@@ -70,6 +70,9 @@ class Settings(BaseSettings):
     chief_featherless_fallback_model: str | None = Field(
         default=None, alias="CHIEF_FEATHERLESS_FALLBACK_MODEL"
     )
+    chief_featherless_fallback_models: tuple[str, ...] = Field(
+        default=(), alias="CHIEF_FEATHERLESS_FALLBACK_MODELS"
+    )
     chief_featherless_max_output_tokens: int = Field(
         default=8192, alias="CHIEF_FEATHERLESS_MAX_OUTPUT_TOKENS"
     )
@@ -172,6 +175,15 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return tuple(origin.strip().rstrip("/") for origin in v.split(",") if origin.strip())
         return tuple(str(origin).strip().rstrip("/") for origin in v if str(origin).strip())
+
+    @field_validator("chief_featherless_fallback_models", mode="before")
+    @classmethod
+    def _fallback_models(cls, v: Any) -> tuple[str, ...]:
+        if not v:
+            return ()
+        if isinstance(v, str):
+            return tuple(model.strip() for model in v.split(",") if model.strip())
+        return tuple(str(model).strip() for model in v if str(model).strip())
 
     @field_validator("chief_backend", mode="before")
     @classmethod

@@ -80,6 +80,10 @@ Optional `CHIEF_FEATHERLESS_FALLBACK_MODEL` is tried automatically when the
 primary provider request errors or times out. It keeps the same Dialogue-OS
 control-session ID and records which model produced the result.
 
+For multiple backups, set the ordered comma-separated
+`CHIEF_FEATHERLESS_FALLBACK_MODELS`. The singular fallback, when present, is
+tried first. Duplicate model IDs and the primary model are removed.
+
 ### Child process environment
 
 `sanitize_env()` in `dialogue_os/codex/client.py` builds the Codex child
