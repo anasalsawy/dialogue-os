@@ -57,6 +57,19 @@ class Settings(BaseSettings):
     codex_control_session_key: str = Field(
         default="primary", alias="CODEX_CONTROL_SESSION_KEY"
     )
+    chief_backend: str = Field(default="codex", alias="CHIEF_BACKEND")
+    chief_featherless_base_url: str = Field(
+        default="https://api.featherless.ai/v1", alias="CHIEF_FEATHERLESS_BASE_URL"
+    )
+    chief_featherless_api_key: str | None = Field(
+        default=None, alias="CHIEF_FEATHERLESS_API_KEY"
+    )
+    chief_featherless_model: str | None = Field(
+        default=None, alias="CHIEF_FEATHERLESS_MODEL"
+    )
+    chief_featherless_max_output_tokens: int = Field(
+        default=8192, alias="CHIEF_FEATHERLESS_MAX_OUTPUT_TOKENS"
+    )
 
     hermes_base_url: str | None = Field(default=None, alias="HERMES_BASE_URL")
     hermes_api_key: str | None = Field(default=None, alias="HERMES_API_KEY")
@@ -136,6 +149,8 @@ class Settings(BaseSettings):
         "browserbase_api_key",
         "browserbase_project_id",
         "codex_model",
+        "chief_featherless_api_key",
+        "chief_featherless_model",
         "war_room_api_token",
         mode="before",
     )
@@ -153,6 +168,14 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return tuple(origin.strip().rstrip("/") for origin in v.split(",") if origin.strip())
         return tuple(str(origin).strip().rstrip("/") for origin in v if str(origin).strip())
+
+    @field_validator("chief_backend", mode="before")
+    @classmethod
+    def _chief_backend(cls, v: Any) -> str:
+        value = str(v or "codex").strip().lower()
+        if value not in {"codex", "featherless"}:
+            raise ValueError("CHIEF_BACKEND must be 'codex' or 'featherless'")
+        return value
 
     def bot_token_map(self) -> dict[str, str]:
         mapping = {
