@@ -1,4 +1,4 @@
-"""Hermes OpenAI-compatible client with persistent per-profile sessions."""
+"""Hermes OpenAI-compatible client with persistent scoped sessions."""
 
 from __future__ import annotations
 
@@ -29,6 +29,7 @@ class HermesClient:
         max_output_tokens: int = 4096,
         timeout_seconds: int = 120,
         fallback_models: tuple[str, ...] = (),
+        session_scope: str = "chat",
     ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
@@ -36,11 +37,23 @@ class HermesClient:
         self.store = store
         self.max_output_tokens = max_output_tokens
         self.timeout_seconds = timeout_seconds
+        if session_scope not in {"chat", "profile"}:
+            raise ValueError("session_scope must be 'chat' or 'profile'")
+        self.session_scope = session_scope
         self.fallback_models = tuple(
             value
             for value in dict.fromkeys(fallback_models)
             if value and value != model
         )
+
+    def _session_chat_id(self, chat_id: int) -> int:
+        """Map transport chats to their configured Hermes memory scope.
+
+        ``0`` is a synthetic key: Telegram never assigns it to a real chat.
+        The profile remains part of the database primary key, so agents never
+        share memory with one another.
+        """
+        return 0 if self.session_scope == "profile" else chat_id
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -58,9 +71,10 @@ class HermesClient:
         )
 
     async def get_history(self, profile: str, chat_id: int) -> tuple[str, list[dict]]:
+        session_chat_id = self._session_chat_id(chat_id)
         row = await self.store.fetchone(
             "SELECT session_id, messages_json FROM hermes_sessions WHERE profile=? AND chat_id=?",
-            (profile, chat_id),
+            (profile, session_chat_id),
         )
         if not row:
             session_id = uuid.uuid4().hex
@@ -70,6 +84,7 @@ class HermesClient:
     async def save_history(
         self, profile: str, chat_id: int, session_id: str, messages: list[dict]
     ) -> None:
+        session_chat_id = self._session_chat_id(chat_id)
         # Keep last N messages for context without unbounded growth
         trimmed = messages[-40:]
         now = time.time()
@@ -82,7 +97,7 @@ class HermesClient:
                 messages_json=excluded.messages_json,
                 updated_at=excluded.updated_at
             """,
-            (profile, chat_id, session_id, json.dumps(trimmed), now, now),
+            (profile, session_chat_id, session_id, json.dumps(trimmed), now, now),
         )
 
     async def chat(
