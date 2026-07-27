@@ -67,6 +67,9 @@ class Settings(BaseSettings):
     chief_featherless_model: str | None = Field(
         default=None, alias="CHIEF_FEATHERLESS_MODEL"
     )
+    chief_featherless_fallback_model: str | None = Field(
+        default=None, alias="CHIEF_FEATHERLESS_FALLBACK_MODEL"
+    )
     chief_featherless_max_output_tokens: int = Field(
         default=8192, alias="CHIEF_FEATHERLESS_MAX_OUTPUT_TOKENS"
     )
@@ -151,6 +154,7 @@ class Settings(BaseSettings):
         "codex_model",
         "chief_featherless_api_key",
         "chief_featherless_model",
+        "chief_featherless_fallback_model",
         "war_room_api_token",
         mode="before",
     )

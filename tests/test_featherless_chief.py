@@ -56,6 +56,35 @@ async def test_featherless_chief_forwards_completed_text(store: Store):
     assert partials == ["finished"]
 
 
+async def test_featherless_chief_falls_back_on_primary_error(store: Store):
+    client = FeatherlessChiefClient(
+        store=store,
+        api_key="test-key",
+        model="darkc0de/Agent.Xortron",
+        fallback_model="deepseek-ai/DeepSeek-V3.1-Terminus",
+    )
+    client.client.chat = AsyncMock(
+        return_value={"ok": False, "text": "", "error": "primary unavailable"}
+    )
+    assert client.fallback_client is not None
+    client.fallback_client.chat = AsyncMock(
+        return_value={"ok": True, "text": "fallback ready", "error": None}
+    )
+
+    result = await client.run("work", session_id="session-1")
+
+    assert result.ok
+    assert result.text == "fallback ready"
+    assert result.session_id == "session-1"
+    assert result.raw_events == [
+        {
+            "type": "provider_result",
+            "model": "deepseek-ai/DeepSeek-V3.1-Terminus",
+            "fallback": True,
+        }
+    ]
+
+
 def test_featherless_chief_requires_credentials(store):
     with pytest.raises(ValueError, match="API_KEY"):
         FeatherlessChiefClient(store=store, api_key="", model="test/model")

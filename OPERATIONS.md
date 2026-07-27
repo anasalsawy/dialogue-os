@@ -76,6 +76,10 @@ the runtime falls back to `HERMES_API_KEY` or `HERMES_MODEL`. Chief uses a
 separate persistent profile keyed by its control-session ID, so this does not
 overwrite specialist conversations.
 
+Optional `CHIEF_FEATHERLESS_FALLBACK_MODEL` is tried automatically when the
+primary provider request errors or times out. It keeps the same Dialogue-OS
+control-session ID and records which model produced the result.
+
 ### Child process environment
 
 `sanitize_env()` in `dialogue_os/codex/client.py` builds the Codex child
