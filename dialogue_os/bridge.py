@@ -66,7 +66,21 @@ class BridgeService:
         self.settings = settings or get_settings()
         self.store = Store(self.settings.database_path)
         self.registry = AgentRegistry(self.store, self.settings)
-        if self.settings.chief_backend == "featherless":
+        if self.settings.chief_backend == "featherless" or self.settings.uncensored_fleet_mode:
+            chief_model = (
+                self.settings.uncensored_primary_model
+                if self.settings.uncensored_fleet_mode
+                else (
+                    self.settings.chief_featherless_model
+                    or self.settings.hermes_model
+                    or ""
+                )
+            )
+            chief_fallbacks = (
+                self.settings.uncensored_fallback_models
+                if self.settings.uncensored_fleet_mode
+                else self.settings.chief_featherless_fallback_models
+            )
             self.codex_client = FeatherlessChiefClient(
                 store=self.store,
                 base_url=self.settings.chief_featherless_base_url,
@@ -75,13 +89,13 @@ class BridgeService:
                     or self.settings.hermes_api_key
                     or ""
                 ),
-                model=(
-                    self.settings.chief_featherless_model
-                    or self.settings.hermes_model
-                    or ""
+                model=chief_model,
+                fallback_model=(
+                    None
+                    if self.settings.uncensored_fleet_mode
+                    else self.settings.chief_featherless_fallback_model
                 ),
-                fallback_model=self.settings.chief_featherless_fallback_model,
-                fallback_models=self.settings.chief_featherless_fallback_models,
+                fallback_models=chief_fallbacks,
                 max_output_tokens=self.settings.chief_featherless_max_output_tokens,
                 timeout_seconds=self.settings.codex_timeout_seconds,
             )
@@ -126,13 +140,23 @@ class BridgeService:
         # Hermes optional until configured
         missing_hermes = self.settings.missing_for_hermes()
         if not missing_hermes:
+            hermes_model = (
+                self.settings.uncensored_primary_model
+                if self.settings.uncensored_fleet_mode
+                else (self.settings.hermes_model or "")
+            )
             self.hermes = HermesClient(
                 base_url=self.settings.hermes_base_url or "",
                 api_key=self.settings.hermes_api_key or "",
-                model=self.settings.hermes_model or "",
+                model=hermes_model,
                 store=self.store,
                 max_output_tokens=self.settings.hermes_max_output_tokens,
                 timeout_seconds=self.settings.hermes_timeout_seconds,
+                fallback_models=(
+                    self.settings.uncensored_fallback_models
+                    if self.settings.uncensored_fleet_mode
+                    else ()
+                ),
             )
         else:
             log.warning("hermes_not_configured", missing=missing_hermes)
@@ -320,22 +344,27 @@ class BridgeService:
                 "session_id": codex_sid,
                 "backend": (
                     "featherless"
-                    if self.settings.chief_backend == "featherless"
+                    if (
+                        self.settings.chief_backend == "featherless"
+                        or self.settings.uncensored_fleet_mode
+                    )
                     else "codex_cli"
                 ),
                 "mode": "agent (default)",
-                "sandbox": False,
                 "sandbox": self.codex_client.sandbox,
                 "model": getattr(self.codex_client, "model", None),
                 "fallback_model": getattr(self.codex_client, "fallback_model", None),
                 "fallback_models": getattr(self.codex_client, "fallback_models", ()),
+                "uncensored_fleet_mode": self.settings.uncensored_fleet_mode,
                 "approval_mode": "unrestricted",
                 "env_sanitized": True,
             },
             "hermes": {
                 "configured": self.hermes is not None,
                 "base_url": self.settings.hermes_base_url,
-                "model": self.settings.hermes_model,
+                "model": getattr(self.hermes, "model", self.settings.hermes_model),
+                "fallback_models": getattr(self.hermes, "fallback_models", ()),
+                "uncensored_fleet_mode": self.settings.uncensored_fleet_mode,
             },
             "browser": self.browser.status() if self.browser else {},
             "bots": {
