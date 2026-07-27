@@ -28,6 +28,7 @@ class HermesClient:
         store: Store,
         max_output_tokens: int = 4096,
         timeout_seconds: int = 120,
+        fallback_models: tuple[str, ...] = (),
     ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
@@ -35,6 +36,11 @@ class HermesClient:
         self.store = store
         self.max_output_tokens = max_output_tokens
         self.timeout_seconds = timeout_seconds
+        self.fallback_models = tuple(
+            value
+            for value in dict.fromkeys(fallback_models)
+            if value and value != model
+        )
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -105,17 +111,32 @@ class HermesClient:
         if "azure" in self.base_url.lower():
             raise RuntimeError("Refusing Hermes Azure endpoint")
 
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-                resp = await client.post(url, headers=self._headers(), json=payload)
-                resp.raise_for_status()
-                data = resp.json()
-        except Exception as e:
-            log.error("hermes_error", profile=profile, error=redact_text(str(e)))
+        data: dict[str, Any] | None = None
+        last_error: Exception | None = None
+        used_model = self.model
+        async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+            for candidate in (self.model, *self.fallback_models):
+                payload["model"] = candidate
+                try:
+                    resp = await client.post(url, headers=self._headers(), json=payload)
+                    resp.raise_for_status()
+                    data = resp.json()
+                    used_model = candidate
+                    break
+                except Exception as e:
+                    last_error = e
+                    log.warning(
+                        "hermes_model_failed",
+                        profile=profile,
+                        model=candidate,
+                        error=redact_text(str(e)),
+                    )
+        if data is None:
+            log.error("hermes_error", profile=profile, error=redact_text(str(last_error)))
             return {
                 "ok": False,
                 "text": "",
-                "error": redact_text(str(e)),
+                "error": redact_text(str(last_error)),
                 "session_id": session_id,
                 "usage": None,
             }
@@ -145,5 +166,6 @@ class HermesClient:
             "error": None,
             "session_id": session_id,
             "usage": usage,
-            "model": self.model,
+            "model": used_model,
+            "fallback": used_model != self.model,
         }

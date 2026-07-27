@@ -76,6 +76,18 @@ class Settings(BaseSettings):
     chief_featherless_max_output_tokens: int = Field(
         default=8192, alias="CHIEF_FEATHERLESS_MAX_OUTPUT_TOKENS"
     )
+    uncensored_fleet_mode: bool = Field(default=False, alias="UNCENSORED_FLEET_MODE")
+    uncensored_primary_model: str = Field(
+        default="darkc0de/Agent.Xortron", alias="UNCENSORED_PRIMARY_MODEL"
+    )
+    uncensored_fallback_models: tuple[str, ...] = Field(
+        default=(
+            "darkc0de/XORTRON",
+            "ArliAI/Qwen3.5-27B-Derestricted",
+            "huihui-ai/Llama-3.3-70B-Instruct-abliterated-finetuned",
+        ),
+        alias="UNCENSORED_FALLBACK_MODELS",
+    )
 
     hermes_base_url: str | None = Field(default=None, alias="HERMES_BASE_URL")
     hermes_api_key: str | None = Field(default=None, alias="HERMES_API_KEY")
@@ -176,7 +188,11 @@ class Settings(BaseSettings):
             return tuple(origin.strip().rstrip("/") for origin in v.split(",") if origin.strip())
         return tuple(str(origin).strip().rstrip("/") for origin in v if str(origin).strip())
 
-    @field_validator("chief_featherless_fallback_models", mode="before")
+    @field_validator(
+        "chief_featherless_fallback_models",
+        "uncensored_fallback_models",
+        mode="before",
+    )
     @classmethod
     def _fallback_models(cls, v: Any) -> tuple[str, ...]:
         if not v:
@@ -221,7 +237,7 @@ class Settings(BaseSettings):
             missing.append("HERMES_BASE_URL")
         if not self.hermes_api_key:
             missing.append("HERMES_API_KEY")
-        if not self.hermes_model:
+        if not self.hermes_model and not self.uncensored_fleet_mode:
             missing.append("HERMES_MODEL")
         return missing
 

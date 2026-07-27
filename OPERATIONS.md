@@ -84,6 +84,14 @@ For multiple backups, set the ordered comma-separated
 `CHIEF_FEATHERLESS_FALLBACK_MODELS`. The singular fallback, when present, is
 tried first. Duplicate model IDs and the primary model are removed.
 
+## Uncensored fleet switch
+
+`UNCENSORED_FLEET_MODE=true` overrides the model for Chief and every Hermes
+specialist with `UNCENSORED_PRIMARY_MODEL` and the ordered
+`UNCENSORED_FALLBACK_MODELS`. Normal role prompts, mission gates, evidence
+requirements, and tool authorization remain active. Turning the switch off
+restores the normal Chief and specialist model selections.
+
 ### Child process environment
 
 `sanitize_env()` in `dialogue_os/codex/client.py` builds the Codex child
