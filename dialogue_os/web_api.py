@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 from aiohttp import web
 
 from dialogue_os.offices.assign import CHIEF_ASSIGN_INSTRUCTIONS
+from dialogue_os.codex.control import new_event_id
 from dialogue_os.util.redact import redact_text
 
 if TYPE_CHECKING:
@@ -162,7 +163,7 @@ async def _command(request: web.Request) -> web.Response:
     visible, _ = bridge._strip_assignments_for_api(decision.text or "")
     await bridge.store.append_canonical_event(
         {
-            "event_id": bridge.new_event_id(),
+            "event_id": new_event_id(),
             "agent_id": "chief",
             "event_type": "war_room_command",
             "summary": visible[:2000],
