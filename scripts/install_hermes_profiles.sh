@@ -52,6 +52,7 @@ git -C "${prompt_checkout}" checkout --quiet 18bbcf6df670cefcdd6c6b45a759bee5ed0
 python3 "${PROJECT_ROOT}/scripts/build_hermes_souls.py" \
   --prompt-repo "${prompt_checkout}" \
   --role-dir "${PROJECT_ROOT}/hermes_profiles" \
+  --ethics-file "${PROJECT_ROOT}/hermes_profiles/shared/islamic-ethics.md" \
   --destination "${HERMES_ROOT}/profiles"
 
 for index in "${!profiles[@]}"; do
