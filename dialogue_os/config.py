@@ -5,10 +5,10 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 DEFAULT_ROOT = Path("/home/azureuser/dialogue-os")
 
@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     chief_featherless_fallback_model: str | None = Field(
         default=None, alias="CHIEF_FEATHERLESS_FALLBACK_MODEL"
     )
-    chief_featherless_fallback_models: tuple[str, ...] = Field(
+    chief_featherless_fallback_models: Annotated[tuple[str, ...], NoDecode] = Field(
         default=(), alias="CHIEF_FEATHERLESS_FALLBACK_MODELS"
     )
     chief_featherless_max_output_tokens: int = Field(
@@ -80,7 +80,7 @@ class Settings(BaseSettings):
     uncensored_primary_model: str = Field(
         default="darkc0de/Agent.Xortron", alias="UNCENSORED_PRIMARY_MODEL"
     )
-    uncensored_fallback_models: tuple[str, ...] = Field(
+    uncensored_fallback_models: Annotated[tuple[str, ...], NoDecode] = Field(
         default=(
             "darkc0de/XORTRON",
             "ArliAI/Qwen3.5-27B-Derestricted",
@@ -136,7 +136,7 @@ class Settings(BaseSettings):
     health_bind: str = Field(default="127.0.0.1", alias="HEALTH_BIND")
     health_port: int = Field(default=8787, alias="HEALTH_PORT")
     war_room_api_token: str | None = Field(default=None, alias="WAR_ROOM_API_TOKEN")
-    war_room_allowed_origins: tuple[str, ...] = Field(
+    war_room_allowed_origins: Annotated[tuple[str, ...], NoDecode] = Field(
         default=("https://yta-war-room-live.masryalsawy.chatgpt.site",),
         alias="WAR_ROOM_ALLOWED_ORIGINS",
     )
