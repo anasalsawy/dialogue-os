@@ -13,6 +13,11 @@ Persistent multi-agent runtime for Your Travel Agent on this VM.
 
 Every managed Telegram ingress goes through the persistent Codex CLI controller first. Codex answers as Chief, or dispatches to a Hermes profile; the reply is published through the correct bot identity.
 
+Temporary fallback: set `CHIEF_BACKEND=featherless` to run Chief through a
+separate Featherless OpenAI-compatible model while leaving every specialist
+Hermes profile unchanged. Set it back to `codex` after Codex authentication is
+available.
+
 See [REBUILD_CONTEXT.md](REBUILD_CONTEXT.md), [ARCHITECTURE.md](ARCHITECTURE.md), and [OPERATIONS.md](OPERATIONS.md).
 
 ## Fixed workspace

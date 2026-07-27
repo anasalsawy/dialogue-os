@@ -37,32 +37,42 @@ async def _async_main() -> int:
     except RuntimeError as e:
         errors.append(str(e))
 
-    which = shutil.which(settings.codex_cli_bin)
-    home_bin = Path.home() / ".local/bin" / settings.codex_cli_bin
-    if not which and not home_bin.exists():
-        errors.append(f"Codex CLI not found: {settings.codex_cli_bin}")
-    print(f"Codex CLI: found ({settings.codex_cli_bin})")
-    try:
-        client = CodexClient(
-            settings.dialogue_os_root,
-            cli_bin=settings.codex_cli_bin,
-            model=settings.codex_model,
-        )
-        client.resolve_bin()
-        print(f"Codex sandbox: {client.sandbox}")
-    except Exception as e:
-        errors.append(f"Codex policy check failed: {e}")
+    print(f"Chief backend: {settings.chief_backend}")
+    if settings.chief_backend == "codex":
+        which = shutil.which(settings.codex_cli_bin)
+        home_bin = Path.home() / ".local/bin" / settings.codex_cli_bin
+        if not which and not home_bin.exists():
+            errors.append(f"Codex CLI not found: {settings.codex_cli_bin}")
+        else:
+            print(f"Codex CLI: found ({settings.codex_cli_bin})")
+        try:
+            client = CodexClient(
+                settings.dialogue_os_root,
+                cli_bin=settings.codex_cli_bin,
+                model=settings.codex_model,
+            )
+            client.resolve_bin()
+            print(f"Codex sandbox: {client.sandbox}")
+        except Exception as e:
+            errors.append(f"Codex policy check failed: {e}")
 
-    child_env = sanitize_env(workspace=settings.dialogue_os_root)
-    leaked = sorted(
-        k
-        for k in child_env
-        if k.startswith(("TELEGRAM_", "HERMES_", "BROWSERBASE_", "AZURE_"))
-    )
-    if leaked:
-        errors.append(f"Codex child env would leak: {', '.join(leaked)}")
+        child_env = sanitize_env(workspace=settings.dialogue_os_root)
+        leaked = sorted(
+            k
+            for k in child_env
+            if k.startswith(("TELEGRAM_", "HERMES_", "BROWSERBASE_", "AZURE_"))
+        )
+        if leaked:
+            errors.append(f"Codex child env would leak: {', '.join(leaked)}")
+        else:
+            print(f"Codex child env: sanitized ({len(child_env)} vars, no bridge secrets)")
     else:
-        print(f"Codex child env: sanitized ({len(child_env)} vars, no bridge secrets)")
+        if not (settings.chief_featherless_api_key or settings.hermes_api_key):
+            errors.append("missing CHIEF_FEATHERLESS_API_KEY (or HERMES_API_KEY fallback)")
+        if not (settings.chief_featherless_model or settings.hermes_model):
+            errors.append("missing CHIEF_FEATHERLESS_MODEL (or HERMES_MODEL fallback)")
+        if "featherless.ai" not in settings.chief_featherless_base_url.lower():
+            warnings.append("Chief Featherless URL does not contain featherless.ai")
 
     for item in settings.missing_required_for_bridge():
         errors.append(f"missing {item}")

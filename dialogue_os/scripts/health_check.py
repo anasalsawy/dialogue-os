@@ -33,17 +33,20 @@ async def main() -> int:
         sessions = await store.list_cursor_sessions()
         agents = await store.list_agents()
         await store.close()
-        cli = CodexClient(settings.dialogue_os_root, settings.codex_cli_bin)
-        try:
-            bin_path = cli.resolve_bin()
-        except Exception as e:
-            bin_path = str(e)
+        bin_path = None
+        if settings.chief_backend == "codex":
+            cli = CodexClient(settings.dialogue_os_root, settings.codex_cli_bin)
+            try:
+                bin_path = cli.resolve_bin()
+            except Exception as e:
+                bin_path = str(e)
         print(
             json.dumps(
                 {
                     "ok": False,
                     "reason": "bridge_not_running",
                     "dialogue_os_root": str(settings.dialogue_os_root),
+                    "chief_backend": settings.chief_backend,
                     "codex_bin": bin_path,
                     "codex_sessions": sessions,
                     "agents": [

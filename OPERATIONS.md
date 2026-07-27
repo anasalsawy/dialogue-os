@@ -67,6 +67,15 @@ may instead use the documented API-key or Codex access-token login flow.
 Operational Chief runs in Codex's `workspace-write` sandbox. Do not add
 `--dangerously-bypass-approvals-and-sandbox`.
 
+## Temporary Featherless Chief
+
+Set `CHIEF_BACKEND=featherless`, `CHIEF_FEATHERLESS_API_KEY`, and
+`CHIEF_FEATHERLESS_MODEL`. The default endpoint is
+`https://api.featherless.ai/v1`. If the Chief-specific key or model is empty,
+the runtime falls back to `HERMES_API_KEY` or `HERMES_MODEL`. Chief uses a
+separate persistent profile keyed by its control-session ID, so this does not
+overwrite specialist conversations.
+
 ### Child process environment
 
 `sanitize_env()` in `dialogue_os/codex/client.py` builds the Codex child

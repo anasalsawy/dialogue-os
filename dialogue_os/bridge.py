@@ -22,6 +22,7 @@ from dialogue_os.codex.control import ControlPlane, new_event_id
 from dialogue_os.codex.sessions import CodexSessionManager
 from dialogue_os.db.store import Store
 from dialogue_os.hermes.client import HermesClient
+from dialogue_os.featherless.chief import FeatherlessChiefClient
 from dialogue_os.maf.orchestration import Orchestrator
 from dialogue_os.offices.assign import (
     CHIEF_ASSIGN_INSTRUCTIONS,
@@ -65,12 +66,30 @@ class BridgeService:
         self.settings = settings or get_settings()
         self.store = Store(self.settings.database_path)
         self.registry = AgentRegistry(self.store, self.settings)
-        self.codex_client = CodexClient(
-            workspace=self.settings.dialogue_os_root,
-            cli_bin=self.settings.codex_cli_bin,
-            model=self.settings.codex_model,
-            timeout_seconds=self.settings.codex_timeout_seconds,
-        )
+        if self.settings.chief_backend == "featherless":
+            self.codex_client = FeatherlessChiefClient(
+                store=self.store,
+                base_url=self.settings.chief_featherless_base_url,
+                api_key=(
+                    self.settings.chief_featherless_api_key
+                    or self.settings.hermes_api_key
+                    or ""
+                ),
+                model=(
+                    self.settings.chief_featherless_model
+                    or self.settings.hermes_model
+                    or ""
+                ),
+                max_output_tokens=self.settings.chief_featherless_max_output_tokens,
+                timeout_seconds=self.settings.codex_timeout_seconds,
+            )
+        else:
+            self.codex_client = CodexClient(
+                workspace=self.settings.dialogue_os_root,
+                cli_bin=self.settings.codex_cli_bin,
+                model=self.settings.codex_model,
+                timeout_seconds=self.settings.codex_timeout_seconds,
+            )
         self.sessions = CodexSessionManager(
             self.store, self.codex_client, self.settings.codex_control_session_key
         )
@@ -297,10 +316,15 @@ class BridgeService:
                 "bin": self.settings.codex_cli_bin,
                 "model": self.settings.codex_model or "default/auto",
                 "session_id": codex_sid,
-                "backend": "codex_cli",
+                "backend": (
+                    "featherless"
+                    if self.settings.chief_backend == "featherless"
+                    else "codex_cli"
+                ),
                 "mode": "agent (default)",
                 "sandbox": False,
                 "sandbox": self.codex_client.sandbox,
+                "model": getattr(self.codex_client, "model", None),
                 "approval_mode": "unrestricted",
                 "env_sanitized": True,
             },
