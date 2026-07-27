@@ -97,6 +97,11 @@ class Settings(BaseSettings):
 
     health_bind: str = Field(default="127.0.0.1", alias="HEALTH_BIND")
     health_port: int = Field(default=8787, alias="HEALTH_PORT")
+    war_room_api_token: str | None = Field(default=None, alias="WAR_ROOM_API_TOKEN")
+    war_room_allowed_origins: tuple[str, ...] = Field(
+        default=("https://yta-war-room-live.masryalsawy.chatgpt.site",),
+        alias="WAR_ROOM_ALLOWED_ORIGINS",
+    )
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     service_user: str = Field(default="azureuser", alias="SERVICE_USER")
     bot_to_bot_chatter: bool = Field(default=False, alias="BOT_TO_BOT_CHATTER")
@@ -136,6 +141,7 @@ class Settings(BaseSettings):
         "cursor_model",
         "cursor_api_key",
         "cursor_force_flag",
+        "war_room_api_token",
         mode="before",
     )
     @classmethod
@@ -155,6 +161,15 @@ class Settings(BaseSettings):
         if val in ("yolo", "--yolo"):
             return "--yolo"
         raise ValueError("CURSOR_FORCE_FLAG must be '--force', '--yolo', or empty (auto-detect)")
+
+    @field_validator("war_room_allowed_origins", mode="before")
+    @classmethod
+    def _origins(cls, v: Any) -> tuple[str, ...]:
+        if not v:
+            return ()
+        if isinstance(v, str):
+            return tuple(origin.strip().rstrip("/") for origin in v.split(",") if origin.strip())
+        return tuple(str(origin).strip().rstrip("/") for origin in v if str(origin).strip())
 
     def bot_token_map(self) -> dict[str, str]:
         mapping = {

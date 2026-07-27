@@ -42,6 +42,7 @@ from dialogue_os.telegram.api import TelegramBot, TypingKeepalive
 from dialogue_os.util.logging import configure_logging, get_logger
 from dialogue_os.util.redact import redact_text
 from dialogue_os.watchers.service import WatcherService
+from dialogue_os.web_api import install_war_room_api
 
 log = get_logger("bridge")
 
@@ -256,6 +257,10 @@ class BridgeService:
         app = web.Application()
         app.router.add_get("/health", self._health_handler)
         app.router.add_get("/status", self._status_handler)
+        if self.settings.war_room_api_token:
+            install_war_room_api(app, self)
+        else:
+            log.warning("war_room_api_disabled", missing="WAR_ROOM_API_TOKEN")
         self._health_runner = web.AppRunner(app)
         await self._health_runner.setup()
         site = web.TCPSite(
@@ -315,7 +320,19 @@ class BridgeService:
             "open_missions": len(await self.missions.list_open()),
             "azure_llm_disabled": self.settings.azure_llm_disabled,
             "canonical_channel_id": self.settings.telegram_canonical_channel_id,
+            "war_room_api": {
+                "enabled": bool(self.settings.war_room_api_token),
+                "allowed_origins": list(self.settings.war_room_allowed_origins),
+            },
         }
+
+    @staticmethod
+    def _strip_assignments_for_api(text: str):
+        return parse_and_strip_assignments(text)
+
+    @staticmethod
+    def new_event_id() -> str:
+        return new_event_id()
 
     async def stop(self) -> None:
         self._stopping = True
