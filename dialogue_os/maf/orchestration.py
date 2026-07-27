@@ -1,7 +1,7 @@
 """Microsoft Agent Framework — lightweight orchestration helpers.
 
 MAF is used for selection hints, handoffs, and temporary group workflows.
-It must NOT replace Cursor (Chief) or Hermes personality backends.
+It must NOT replace Codex (Chief) or Hermes personality backends.
 The experimental double-lobe/supervisor-lobe design is intentionally not implemented.
 """
 

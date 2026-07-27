@@ -1,7 +1,7 @@
 """Department-office registry.
 
 Dialogue-OS is organised as separate Telegram department offices. Each office is
-one group containing the owner (Anas), Chief (Cursor-backed manager) and exactly
+one group containing the owner (Anas), Chief (Codex-backed manager) and exactly
 one specialist (Hermes-backed). Chief is in every office; a specialist is only in
 its own. Isolating one specialist per office is what prevents the "bot zoo".
 

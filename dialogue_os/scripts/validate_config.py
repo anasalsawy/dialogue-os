@@ -15,7 +15,7 @@ if str(ROOT) not in sys.path:
 
 from dialogue_os.agents.registry import AgentRegistry
 from dialogue_os.config import get_settings
-from dialogue_os.cursor.client import sanitize_env
+from dialogue_os.codex.client import CodexClient, sanitize_env
 from dialogue_os.db.store import Store
 
 
@@ -37,70 +37,32 @@ async def _async_main() -> int:
     except RuntimeError as e:
         errors.append(str(e))
 
-    which = shutil.which(settings.cursor_cli_bin)
-    home_bin = Path.home() / ".local/bin" / settings.cursor_cli_bin
+    which = shutil.which(settings.codex_cli_bin)
+    home_bin = Path.home() / ".local/bin" / settings.codex_cli_bin
     if not which and not home_bin.exists():
-        errors.append(f"Cursor CLI not found: {settings.cursor_cli_bin}")
-    print(f"Cursor CLI: found ({settings.cursor_cli_bin})")
+        errors.append(f"Codex CLI not found: {settings.codex_cli_bin}")
+    print(f"Codex CLI: found ({settings.codex_cli_bin})")
     try:
-        from dialogue_os.cursor.client import (
-            CursorClient,
-            ensure_cli_unrestricted,
-            parse_force_flag_from_help,
-        )
-
-        ensure_cli_unrestricted()
-        client = CursorClient(
+        client = CodexClient(
             settings.dialogue_os_root,
-            cli_bin=settings.cursor_cli_bin,
-            api_key=settings.cursor_api_key,
-            force_flag=settings.cursor_force_flag,
-            ensure_unrestricted_config=False,
+            cli_bin=settings.codex_cli_bin,
+            model=settings.codex_model,
         )
-        force_flag = client.resolve_force_flag()
-        print(f"Cursor unrestricted flag: {force_flag}")
-        print("Cursor approval mode: unrestricted (Run Everything)")
-        print("Cursor sandbox: disabled (not passed on CLI)")
+        client.resolve_bin()
+        print(f"Codex sandbox: {client.sandbox}")
     except Exception as e:
-        errors.append(f"Cursor unrestricted policy check failed: {e}")
+        errors.append(f"Codex policy check failed: {e}")
 
-    cli_permissions = settings.dialogue_os_root / ".cursor" / "cli.json"
-    if cli_permissions.exists():
-        try:
-            perms = json.loads(cli_permissions.read_text())["permissions"]
-            deny = perms.get("deny") or []
-            allow = perms.get("allow") or []
-            if deny:
-                errors.append(
-                    ".cursor/cli.json still has deny rules that can reject execution; "
-                    "clear deny for unrestricted Agent"
-                )
-            print(f"Cursor project permissions: {len(allow)} allow / {len(deny)} deny")
-        except (ValueError, KeyError, TypeError) as e:
-            errors.append(f".cursor/cli.json is malformed: {e}")
-    else:
-        warnings.append(
-            ".cursor/cli.json missing — run: bash scripts/cursor-permissions/install.sh"
-        )
-
-    if (settings.dialogue_os_root / ".cursorignore").exists():
-        print("Cursor ignore file: present")
-    else:
-        warnings.append(
-            ".cursorignore missing — run: bash scripts/cursor-permissions/install.sh"
-        )
-
-    child_env = sanitize_env(workspace=settings.dialogue_os_root, api_key=settings.cursor_api_key)
+    child_env = sanitize_env(workspace=settings.dialogue_os_root)
     leaked = sorted(
         k
         for k in child_env
-        if k != "CURSOR_API_KEY"
-        and k.startswith(("TELEGRAM_", "HERMES_", "BROWSERBASE_", "AZURE_"))
+        if k.startswith(("TELEGRAM_", "HERMES_", "BROWSERBASE_", "AZURE_"))
     )
     if leaked:
-        errors.append(f"Cursor child env would leak: {', '.join(leaked)}")
+        errors.append(f"Codex child env would leak: {', '.join(leaked)}")
     else:
-        print(f"Cursor child env: sanitized ({len(child_env)} vars, no bridge secrets)")
+        print(f"Codex child env: sanitized ({len(child_env)} vars, no bridge secrets)")
 
     for item in settings.missing_required_for_bridge():
         errors.append(f"missing {item}")

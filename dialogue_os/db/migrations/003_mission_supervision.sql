@@ -3,7 +3,7 @@
 -- Chief must never assign a task and wait blindly. Every active mission gets a
 -- supervision row holding the whole picture (process, tools, heartbeat, blocker,
 -- evidence, verification) plus the NEXT SUPERVISION TIME. Because next_check_at
--- lives in SQLite rather than in a sleeping Cursor invocation, supervision
+-- lives in SQLite rather than in a sleeping Codex invocation, supervision
 -- resumes correctly after a bridge restart or a VM reboot.
 --
 -- Additive only, plus an in-place rename of the two mission statuses that the

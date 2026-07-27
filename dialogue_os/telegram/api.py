@@ -120,7 +120,7 @@ class TelegramBot:
     async def poll_forever(self, on_update, cancel_handler=None) -> None:
         """Long-poll forever.
 
-        Normal updates are processed on a single worker queue so Cursor work
+        Normal updates are processed on a single worker queue so Codex work
         stays serialized. Cancel updates bypass that queue so /cancel can
         terminate the active subprocess immediately while another turn runs.
         """

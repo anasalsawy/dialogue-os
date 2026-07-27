@@ -1,4 +1,4 @@
-"""Bounded MAF task-DAG validation — never replaces Hermes/Cursor identity."""
+"""Bounded MAF task-DAG validation — never replaces Hermes/Codex identity."""
 
 from __future__ import annotations
 

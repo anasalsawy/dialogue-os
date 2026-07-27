@@ -14,7 +14,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from dialogue_os.config import get_settings
-from dialogue_os.cursor.client import CursorClient
+from dialogue_os.codex.client import CodexClient
 from dialogue_os.db.store import Store
 
 
@@ -33,7 +33,7 @@ async def main() -> int:
         sessions = await store.list_cursor_sessions()
         agents = await store.list_agents()
         await store.close()
-        cli = CursorClient(settings.dialogue_os_root, settings.cursor_cli_bin)
+        cli = CodexClient(settings.dialogue_os_root, settings.codex_cli_bin)
         try:
             bin_path = cli.resolve_bin()
         except Exception as e:
@@ -44,8 +44,8 @@ async def main() -> int:
                     "ok": False,
                     "reason": "bridge_not_running",
                     "dialogue_os_root": str(settings.dialogue_os_root),
-                    "cursor_bin": bin_path,
-                    "cursor_sessions": sessions,
+                    "codex_bin": bin_path,
+                    "codex_sessions": sessions,
                     "agents": [
                         {
                             "agent_id": a["agent_id"],
