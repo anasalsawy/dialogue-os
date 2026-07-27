@@ -100,7 +100,11 @@ class HermesAgentClient:
                     toolsets.raise_for_status()
                     toolset_data = toolsets.json()
                     if isinstance(toolset_data, dict):
-                        toolset_data = toolset_data.get("toolsets", [])
+                        toolset_data = (
+                            toolset_data.get("toolsets")
+                            or toolset_data.get("data")
+                            or []
+                        )
                     if not isinstance(toolset_data, list):
                         raise RuntimeError(
                             f"{profile} Hermes runtime returned malformed toolsets"
