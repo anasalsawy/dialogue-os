@@ -39,9 +39,27 @@ def markdown_section(text: str, heading: str, next_heading: str) -> str:
     return text[start:end].strip()
 
 
-def build_souls(prompt_repo: Path, role_dir: Path, destination: Path) -> list[Path]:
+def build_souls(
+    prompt_repo: Path,
+    role_dir: Path,
+    destination: Path,
+    ethics_file: Path | None = None,
+) -> list[Path]:
     destination.mkdir(parents=True, exist_ok=True)
     generated: list[Path] = []
+    ethics = ethics_file.read_text(encoding="utf-8").strip() if ethics_file else ""
+    ethics_layer = ""
+    if ethics:
+        ethics_layer = (
+            "\n\n# Shared Islamic ethics and behavior layer\n\n"
+            "Apply this layer to character, honesty, dignity, justice, privacy, "
+            "non-aggression, lawful cooperation, promises, and business conduct. "
+            "It does not grant operational authority, override applicable law or "
+            "runtime safety, or justify discrimination, coercion, punishment, or "
+            "religious judgment of any person. Treat every person with equal human "
+            "dignity and follow the agent's authorization boundaries.\n\n"
+            f"{ethics}"
+        )
 
     for profile, filename in MASTER_DOCS.items():
         overlay = (role_dir / f"{profile}.md").read_text(encoding="utf-8").strip()
@@ -49,7 +67,8 @@ def build_souls(prompt_repo: Path, role_dir: Path, destination: Path) -> list[Pa
         output = destination / profile / "SOUL.md"
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(
-            f"{overlay}\n\n# Canonical master system prompt\n\n{master}\n",
+            f"{overlay}{ethics_layer}\n\n"
+            f"# Canonical master system prompt\n\n{master}\n",
             encoding="utf-8",
         )
         generated.append(output)
@@ -71,7 +90,7 @@ def build_souls(prompt_repo: Path, role_dir: Path, destination: Path) -> list[Pa
     growth_output = destination / "growth-lead" / "SOUL.md"
     growth_output.parent.mkdir(parents=True, exist_ok=True)
     growth_output.write_text(
-        f"{overlay}\n\n{shared}\n\n{growth}\n",
+        f"{overlay}{ethics_layer}\n\n{shared}\n\n{growth}\n",
         encoding="utf-8",
     )
     generated.append(growth_output)
@@ -83,9 +102,15 @@ def main() -> int:
     parser.add_argument("--prompt-repo", type=Path, required=True)
     parser.add_argument("--role-dir", type=Path, required=True)
     parser.add_argument("--destination", type=Path, required=True)
+    parser.add_argument("--ethics-file", type=Path)
     args = parser.parse_args()
 
-    generated = build_souls(args.prompt_repo, args.role_dir, args.destination)
+    generated = build_souls(
+        args.prompt_repo,
+        args.role_dir,
+        args.destination,
+        ethics_file=args.ethics_file,
+    )
     for path in generated:
         print(path)
     return 0
