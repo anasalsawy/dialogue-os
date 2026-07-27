@@ -113,6 +113,48 @@ async def test_readiness_rejects_profile_without_tools(store: Store, monkeypatch
         await client.assert_ready(("builder-lead",))
 
 
+async def test_readiness_accepts_wrapped_toolsets_response(store: Store, monkeypatch):
+    clear_proxy_env(monkeypatch)
+
+    async def fake_get(self, url, *, headers):
+        request = httpx.Request("GET", url)
+        if url.endswith("/v1/capabilities"):
+            return httpx.Response(
+                200,
+                request=request,
+                json={
+                    "platform": "hermes-agent",
+                    "features": {"memory": True},
+                },
+            )
+        return httpx.Response(
+            200,
+            request=request,
+            json={
+                "toolsets": [
+                    {
+                        "name": "file_operations",
+                        "enabled": True,
+                        "configured": True,
+                        "tools": ["read_file", "write_file"],
+                    }
+                ]
+            },
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+    client = HermesAgentClient(
+        base_url="http://127.0.0.1:8642",
+        api_key="runtime-secret",
+        store=store,
+    )
+
+    result = await client.assert_ready(("builder-lead",))
+
+    assert result["builder-lead"]["capabilities"] == {"memory": True}
+    assert result["builder-lead"]["tools"] == ["read_file", "write_file"]
+
+
 def test_independent_profile_url_takes_precedence(store: Store):
     client = HermesAgentClient(
         base_url="http://127.0.0.1:8642",
