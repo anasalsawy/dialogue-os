@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING, Any
 from aiohttp import web
 
 from dialogue_os.offices.assign import CHIEF_ASSIGN_INSTRUCTIONS
-from dialogue_os.util.redact import redact_text
 
 if TYPE_CHECKING:
     from dialogue_os.bridge import BridgeService
@@ -69,6 +68,7 @@ def install_war_room_api(app: web.Application, bridge: "BridgeService") -> None:
     app.router.add_get("/api/v1/missions/{mission_id}/events", _mission_events)
     app.router.add_get("/api/v1/events", _canonical_events)
     app.router.add_post("/api/v1/commands", _command)
+    app.router.add_get("/api/v1/commands/{command_id}", _command_status)
 
 
 async def _status(request: web.Request) -> web.Response:
@@ -153,33 +153,36 @@ async def _command(request: web.Request) -> web.Response:
     if len(text) > 20_000:
         raise web.HTTPRequestEntityTooLarge(max_size=20_000, actual_size=len(text))
 
-    decision = await bridge.control.chief_direct(
-        CHIEF_ASSIGN_INSTRUCTIONS + "\n\nOperator message from War Room:\n" + text
+    queued = await bridge.chief_lane.submit(
+        CHIEF_ASSIGN_INSTRUCTIONS + "\n\nOperator message from War Room:\n" + text,
+        source="war_room",
+        priority=0,
     )
-    assignments: list[dict[str, Any]] = []
-    if decision.ok:
-        assignments = await bridge._apply_chief_assignments(decision)
-    visible, _ = bridge._strip_assignments_for_api(decision.text or "")
     await bridge.store.append_canonical_event(
         {
             "event_id": bridge.new_event_id(),
             "agent_id": "chief",
-            "event_type": "war_room_command",
-            "summary": visible[:2000],
-            "evidence": {"assignment_count": len(assignments)},
+            "event_type": "war_room_command_queued",
+            "summary": text[:2000],
+            "evidence": {"command_id": queued["command_id"]},
         }
     )
     return web.json_response(
         {
-            "ok": decision.ok,
-            "chief": visible,
-            "assignments": assignments,
-            "cursor_session_id": decision.cursor_session_id,
-            "duration_seconds": decision.duration_seconds,
-            "error": redact_text(decision.error or "") or None,
+            "ok": True,
+            "accepted": True,
+            "command": queued,
         },
-        status=200 if decision.ok else 502,
+        status=202,
     )
+
+
+async def _command_status(request: web.Request) -> web.Response:
+    bridge: BridgeService = request.app["bridge"]
+    command = bridge.chief_lane.get(request.match_info["command_id"])
+    if command is None:
+        raise web.HTTPNotFound(text="Command not found")
+    return web.json_response({"command": command})
 
 
 def _mission_row(row: Any) -> dict[str, Any]:

@@ -15,6 +15,7 @@ from urllib.parse import quote
 import httpx
 
 from dialogue_os.db.store import Store
+from dialogue_os.hermes.model_router import FeatherlessModelRouter
 from dialogue_os.util.logging import get_logger
 from dialogue_os.util.redact import redact_text
 
@@ -36,6 +37,8 @@ class HermesAgentClient:
         session_scope: str = "profile",
         multiplex_profiles: bool = True,
         profile_urls: dict[str, str] | None = None,
+        model_router: FeatherlessModelRouter | None = None,
+        rotation_attempts: int = 5,
     ):
         if session_scope not in {"chat", "profile"}:
             raise ValueError("session_scope must be 'chat' or 'profile'")
@@ -48,13 +51,21 @@ class HermesAgentClient:
         self.profile_urls = {
             key: value.rstrip("/") for key, value in (profile_urls or {}).items()
         }
+        self.model_router = model_router
+        self.rotation_attempts = max(1, rotation_attempts)
 
-    def _headers(self, profile: str, chat_id: int) -> dict[str, str]:
-        return {
+    def _headers(
+        self, profile: str, chat_id: int, *, model: str | None = None
+    ) -> dict[str, str]:
+        headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
             "X-Hermes-Session-Key": self._session_key(profile, chat_id),
         }
+        if model:
+            # Hermes API server's supported model hot-swap surface.
+            headers["X-Hermes-Model"] = model
+        return headers
 
     def _profile_base(self, profile: str) -> str:
         if profile in self.profile_urls:
@@ -154,17 +165,80 @@ class HermesAgentClient:
         }
         url = f"{self._profile_base(profile)}/v1/responses"
 
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-                response = await client.post(
-                    url,
-                    headers=self._headers(profile, chat_id),
-                    json=payload,
+        candidates: list[str | None] = [None]
+        if self.model_router:
+            try:
+                discovered = await self.model_router.candidates(profile)
+                if discovered:
+                    candidates = discovered[: self.rotation_attempts]
+            except Exception as exc:
+                log.warning(
+                    "hermes_model_catalog_unavailable",
+                    profile=profile,
+                    error=redact_text(str(exc)),
                 )
-                response.raise_for_status()
-                data = response.json()
-        except Exception as exc:
-            error = redact_text(str(exc))
+
+        data: dict[str, Any] | None = None
+        selected_model: str | None = None
+        last_error = ""
+        async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+            for selected_model in candidates:
+                try:
+                    response = await client.post(
+                        url,
+                        headers=self._headers(
+                            profile, chat_id, model=selected_model
+                        ),
+                        json=payload,
+                    )
+                    response.raise_for_status()
+                    candidate_data = response.json()
+                    candidate_text = self._text_from_response(candidate_data)
+                    candidate_error = str(candidate_data.get("error") or candidate_text)
+                    if (
+                        selected_model
+                        and self.model_router
+                        and self.model_router.should_rotate(text=candidate_error)
+                    ):
+                        self.model_router.failure(selected_model, candidate_error)
+                        last_error = candidate_error
+                        log.warning(
+                            "hermes_model_rotated",
+                            profile=profile,
+                            failed_model=selected_model,
+                            error=redact_text(candidate_error),
+                        )
+                        continue
+                    data = candidate_data
+                    if selected_model and self.model_router:
+                        self.model_router.success(profile, selected_model)
+                    break
+                except httpx.HTTPStatusError as exc:
+                    status = exc.response.status_code
+                    last_error = redact_text(str(exc))
+                    if (
+                        selected_model
+                        and self.model_router
+                        and self.model_router.should_rotate(status=status, text=last_error)
+                    ):
+                        self.model_router.failure(selected_model, last_error)
+                        log.warning(
+                            "hermes_model_rotated",
+                            profile=profile,
+                            failed_model=selected_model,
+                            status=status,
+                            error=last_error,
+                        )
+                        continue
+                    break
+                except Exception as exc:
+                    last_error = redact_text(str(exc))
+                    if selected_model and self.model_router:
+                        self.model_router.failure(selected_model, last_error)
+                    continue
+
+        if data is None:
+            error = last_error or "No eligible Hermes model completed the request"
             log.error("hermes_agent_error", profile=profile, error=error)
             return {
                 "ok": False,
@@ -174,6 +248,8 @@ class HermesAgentClient:
                 "usage": None,
                 "tool_events": [],
                 "backend": "hermes-agent",
+                "model": selected_model,
+                "fallback": bool(selected_model),
             }
 
         text_parts: list[str] = []
@@ -217,8 +293,23 @@ class HermesAgentClient:
             "session_id": response_id,
             "conversation": conversation,
             "usage": data.get("usage"),
-            "model": data.get("model") or profile,
-            "fallback": False,
+            "model": selected_model or data.get("model") or profile,
+            "fallback": bool(selected_model),
             "tool_events": tool_events,
             "backend": "hermes-agent",
         }
+
+    @staticmethod
+    def _text_from_response(data: dict[str, Any]) -> str:
+        values: list[str] = []
+        for item in data.get("output") or []:
+            if not isinstance(item, dict) or item.get("type") != "message":
+                continue
+            for content in item.get("content") or []:
+                if isinstance(content, dict) and content.get("type") in {
+                    "output_text",
+                    "text",
+                }:
+                    if content.get("text"):
+                        values.append(str(content["text"]))
+        return "\n".join(values).strip()

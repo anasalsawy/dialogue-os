@@ -16,6 +16,7 @@ from aiohttp import web
 from dialogue_os.agents.registry import AGENT_DEFS, AgentRegistry
 from dialogue_os.browser.stagehand import BrowserTool
 from dialogue_os.channel.canonical import CanonicalChannel
+from dialogue_os.chief_lane import ChiefLane
 from dialogue_os.config import Settings, get_settings
 from dialogue_os.codex.client import CodexClient
 from dialogue_os.codex.control import ControlPlane, new_event_id
@@ -23,6 +24,7 @@ from dialogue_os.codex.sessions import CodexSessionManager
 from dialogue_os.db.store import Store
 from dialogue_os.hermes.client import HermesClient
 from dialogue_os.hermes.agent_client import HermesAgentClient
+from dialogue_os.hermes.model_router import FeatherlessModelRouter
 from dialogue_os.featherless.chief import FeatherlessChiefClient
 from dialogue_os.maf.orchestration import Orchestrator
 from dialogue_os.offices.assign import (
@@ -111,6 +113,7 @@ class BridgeService:
             self.store, self.codex_client, self.settings.codex_control_session_key
         )
         self.control = ControlPlane(self.sessions, self.store)
+        self.chief_lane = ChiefLane(self._execute_chief_prompt)
         self.orchestrator = Orchestrator(self.store)
         self.offices = OfficeRegistry(self.store, self.settings.telegram_owner_id)
         self.missions = MissionTracker(self.store)
@@ -118,6 +121,7 @@ class BridgeService:
         self.loop_guard = LoopGuard(self.store, self.missions)
         self.bots: dict[str, TelegramBot] = {}
         self.hermes: HermesClient | HermesAgentClient | None = None
+        self.model_router: FeatherlessModelRouter | None = None
         self.canonical: CanonicalChannel | None = None
         self.watchers: WatcherService | None = None
         self.browser: BrowserTool | None = None
@@ -142,6 +146,11 @@ class BridgeService:
         missing_hermes = self.settings.missing_for_hermes()
         if not missing_hermes:
             if self.settings.hermes_backend == "agent_api":
+                if self.settings.hermes_model_rotation_enabled:
+                    self.model_router = FeatherlessModelRouter(
+                        catalog_url=self.settings.hermes_model_catalog_url,
+                        minimum_context=self.settings.hermes_model_minimum_context,
+                    )
                 self.hermes = HermesAgentClient(
                     base_url=self.settings.hermes_agent_api_url or "",
                     api_key=self.settings.hermes_agent_api_key or "",
@@ -150,6 +159,8 @@ class BridgeService:
                     session_scope=self.settings.hermes_session_scope,
                     multiplex_profiles=self.settings.hermes_agent_multiplex_profiles,
                     profile_urls=self.settings.hermes_profile_url_map(),
+                    model_router=self.model_router,
+                    rotation_attempts=self.settings.hermes_model_rotation_attempts,
                 )
                 profiles = tuple(
                     sorted(
@@ -217,6 +228,7 @@ class BridgeService:
             log.info("codex_primary_session", session_id=sid)
         except Exception as e:
             log.error("codex_session_init_failed", error=redact_text(str(e)))
+        self._tasks.append(self.chief_lane.start())
 
         await self._start_health()
 
@@ -393,6 +405,9 @@ class BridgeService:
                 "model": getattr(self.hermes, "model", self.settings.hermes_model),
                 "fallback_models": getattr(self.hermes, "fallback_models", ()),
                 "uncensored_fleet_mode": self.settings.uncensored_fleet_mode,
+                "model_router": (
+                    self.model_router.snapshot() if self.model_router else None
+                ),
             },
             "browser": self.browser.status() if self.browser else {},
             "bots": {
@@ -410,6 +425,7 @@ class BridgeService:
             ],
             "offices_unregistered": await self.offices.unregistered_departments(),
             "open_missions": len(await self.missions.list_open()),
+            "chief_lane": self.chief_lane.status(),
             "azure_llm_disabled": self.settings.azure_llm_disabled,
             "canonical_channel_id": self.settings.telegram_canonical_channel_id,
             "war_room_api": {
@@ -428,6 +444,7 @@ class BridgeService:
 
     async def stop(self) -> None:
         self._stopping = True
+        await self.chief_lane.stop()
         for t in self._tasks:
             t.cancel()
         await asyncio.gather(*self._tasks, return_exceptions=True)
@@ -578,17 +595,29 @@ class BridgeService:
                         # Non-owner humans talking to Chief: still answer, but
                         # Codex is told they may not authorize admin work.
                         pass
-                    decision = await self.control.chief_direct(
-                        await self._chief_prompt_with_auth_boundary(text, admin_authorized)
+                    prompt = await self._chief_prompt_with_auth_boundary(
+                        text, admin_authorized
                     )
-                    if admin_authorized and decision.ok:
-                        results = await self._apply_chief_assignments(decision)
-                        summary = await self._assignment_owner_summary(results)
-                        if summary:
-                            decision.text = (
-                                f"{decision.text}\n\n{summary}" if decision.text else summary
-                            )
-                    await self._execute_decision(decision, event, reply_to=message_id)
+
+                    async def complete(record):
+                        result = record.get("result") or {}
+                        response = result.get("text") or (
+                            f"Chief turn failed: {record.get('error') or 'unknown error'}"
+                        )
+                        await self._send(bot, chat_id, response, reply_to=message_id)
+
+                    queued = await self.chief_lane.submit(
+                        prompt,
+                        source="telegram_private",
+                        priority=0 if admin_authorized else 10,
+                        on_complete=complete,
+                    )
+                    await self._send(
+                        bot,
+                        chat_id,
+                        f"Chief received this command ({queued['command_id'][:8]}).",
+                        reply_to=message_id,
+                    )
                     return
 
                 # Specialist DM → Hermes directly (never through Chief/Codex)
@@ -643,18 +672,50 @@ class BridgeService:
                 if not mentioned and bot.agent_id != "chief":
                     return
                 if destination == "chief" and admin_authorized:
-                    decision = await self.control.chief_direct(
-                        await self._chief_prompt_with_auth_boundary(text, admin_authorized)
+                    prompt = await self._chief_prompt_with_auth_boundary(
+                        text, admin_authorized
                     )
-                    if decision.ok:
-                        results = await self._apply_chief_assignments(decision)
-                        summary = await self._assignment_owner_summary(results)
-                        if summary:
-                            decision.text = (
-                                f"{decision.text}\n\n{summary}" if decision.text else summary
-                            )
-                    await self._execute_decision(decision, event, reply_to=message_id)
+
+                    async def complete(record):
+                        result = record.get("result") or {}
+                        response = result.get("text") or (
+                            f"Chief turn failed: {record.get('error') or 'unknown error'}"
+                        )
+                        await self._send(bot, chat_id, response, reply_to=message_id)
+
+                    queued = await self.chief_lane.submit(
+                        prompt,
+                        source="telegram_group",
+                        priority=0,
+                        on_complete=complete,
+                    )
+                    await self._send(
+                        bot,
+                        chat_id,
+                        f"Chief received this command ({queued['command_id'][:8]}).",
+                        reply_to=message_id,
+                    )
                 return
+
+    async def _execute_chief_prompt(self, prompt: str) -> dict[str, Any]:
+        """Run one serialized Chief turn and apply only explicit assignments."""
+        decision = await self.control.chief_direct(prompt)
+        assignments: list[dict[str, Any]] = []
+        if decision.ok:
+            assignments = await self._apply_chief_assignments(decision)
+            summary = await self._assignment_owner_summary(assignments)
+            if summary:
+                decision.text = (
+                    f"{decision.text}\n\n{summary}" if decision.text else summary
+                )
+        return {
+            "ok": bool(decision.ok),
+            "text": decision.text or "",
+            "assignments": assignments,
+            "cursor_session_id": decision.cursor_session_id,
+            "duration_seconds": decision.duration_seconds,
+            "error": redact_text(decision.error or "") or None,
+        }
 
     async def _chief_prompt_with_auth_boundary(self, text: str, admin_authorized: bool) -> str:
         boundary = (
