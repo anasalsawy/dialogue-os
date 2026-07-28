@@ -104,6 +104,19 @@ class Settings(BaseSettings):
     hermes_agent_profile_urls: str = Field(
         default="", alias="HERMES_AGENT_PROFILE_URLS"
     )
+    hermes_model_rotation_enabled: bool = Field(
+        default=True, alias="HERMES_MODEL_ROTATION_ENABLED"
+    )
+    hermes_model_rotation_attempts: int = Field(
+        default=5, alias="HERMES_MODEL_ROTATION_ATTEMPTS"
+    )
+    hermes_model_minimum_context: int = Field(
+        default=65_536, alias="HERMES_MODEL_MINIMUM_CONTEXT"
+    )
+    hermes_model_catalog_url: str = Field(
+        default="https://api.featherless.ai/v1/models",
+        alias="HERMES_MODEL_CATALOG_URL",
+    )
 
     browserbase_api_key: str | None = Field(default=None, alias="BROWSERBASE_API_KEY")
     browserbase_project_id: str | None = Field(default=None, alias="BROWSERBASE_PROJECT_ID")
