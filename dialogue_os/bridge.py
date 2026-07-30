@@ -19,7 +19,7 @@ from dialogue_os.channel.canonical import CanonicalChannel
 from dialogue_os.chief_lane import ChiefLane
 from dialogue_os.config import Settings, get_settings
 from dialogue_os.codex.client import CodexClient
-from dialogue_os.codex.control import ControlPlane, new_event_id
+from dialogue_os.codex.control import ControlDecision, ControlPlane, new_event_id
 from dialogue_os.codex.sessions import CodexSessionManager
 from dialogue_os.db.store import Store
 from dialogue_os.hermes.client import HermesClient
@@ -53,6 +53,16 @@ log = get_logger("bridge")
 COMMAND_RE = re.compile(r"^/([a-zA-Z0-9_]+)(?:@([a-zA-Z0-9_]+))?(?:\s+(.*))?$", re.DOTALL)
 MENTION_RE = re.compile(r"@([a-zA-Z0-9_]+)")
 LOCK_PATH = Path("/home/azureuser/dialogue-os/data/bridge.lock")
+
+
+class _ChiefControlRouter:
+    """Expose the configured Chief backend to supervisor code."""
+
+    def __init__(self, bridge: "BridgeService"):
+        self.bridge = bridge
+
+    async def chief_direct(self, prompt: str, **_: Any) -> ControlDecision:
+        return await self.bridge._chief_direct(prompt)
 
 
 class BridgeService:
@@ -113,6 +123,7 @@ class BridgeService:
             self.store, self.codex_client, self.settings.codex_control_session_key
         )
         self.control = ControlPlane(self.sessions, self.store)
+        self.chief_control = _ChiefControlRouter(self)
         self.chief_lane = ChiefLane(self._execute_chief_prompt)
         self.orchestrator = Orchestrator(self.store)
         self.offices = OfficeRegistry(self.store, self.settings.telegram_owner_id)
@@ -162,15 +173,14 @@ class BridgeService:
                     model_router=self.model_router,
                     rotation_attempts=self.settings.hermes_model_rotation_attempts,
                 )
-                profiles = tuple(
-                    sorted(
-                        {
-                            item["hermes_profile"]
-                            for item in AGENT_DEFS
-                            if item.get("hermes_profile")
-                        }
-                    )
-                )
+                profile_names = {
+                    item["hermes_profile"]
+                    for item in AGENT_DEFS
+                    if item.get("hermes_profile")
+                }
+                if self.settings.chief_backend == "hermes":
+                    profile_names.add("chief-control")
+                profiles = tuple(sorted(profile_names))
                 runtime = await self.hermes.assert_ready(profiles)
                 log.info(
                     "hermes_agent_runtime_ready",
@@ -244,7 +254,7 @@ class BridgeService:
             self.supervisor = MissionSupervisor(
                 missions=self.missions,
                 supervision=self.supervision,
-                control=self.control,
+                control=self.chief_control,
                 post_office_message=self._post_as_chief,
                 notify_owner=self._notify_owner,
                 notify_watcher=self._notify_watcher,
@@ -699,7 +709,7 @@ class BridgeService:
 
     async def _execute_chief_prompt(self, prompt: str) -> dict[str, Any]:
         """Run one serialized Chief turn and apply only explicit assignments."""
-        decision = await self.control.chief_direct(prompt)
+        decision = await self._chief_direct(prompt)
         assignments: list[dict[str, Any]] = []
         if decision.ok:
             assignments = await self._apply_chief_assignments(decision)
@@ -716,6 +726,33 @@ class BridgeService:
             "duration_seconds": decision.duration_seconds,
             "error": redact_text(decision.error or "") or None,
         }
+
+    async def _chief_direct(self, prompt: str) -> ControlDecision:
+        """Run Chief through its genuine Hermes profile when configured."""
+        if self.settings.chief_backend != "hermes":
+            return await self.control.chief_direct(prompt)
+        if not isinstance(self.hermes, HermesAgentClient):
+            return ControlDecision(
+                action="respond",
+                response_bot="chief",
+                text="Chief Hermes profile is unavailable.",
+                ok=False,
+                error="CHIEF_BACKEND=hermes requires the Hermes Agent API backend",
+            )
+        result = await self.hermes.chat(
+            "chief-control",
+            self.settings.telegram_owner_id or 0,
+            prompt,
+        )
+        return ControlDecision(
+            action="respond",
+            response_bot="chief",
+            text=str(result.get("text") or ""),
+            ok=bool(result.get("ok")),
+            error=result.get("error"),
+            cursor_session_id=result.get("session_id"),
+            raw_text=str(result.get("text") or ""),
+        )
 
     async def _chief_prompt_with_auth_boundary(self, text: str, admin_authorized: bool) -> str:
         boundary = (
@@ -932,7 +969,7 @@ class BridgeService:
                 "unrestricted administrative tasks or reveal secrets."
             )
         prompt = "\n".join(context_bits) + f"\n\nOffice message:\n{text}"
-        decision = await self.control.chief_direct(prompt)
+        decision = await self._chief_direct(prompt)
         await self._execute_decision(decision, event, reply_to=reply_to)
 
         # After Chief speaks, if Telegram may not deliver bot→bot to the specialist,
