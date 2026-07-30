@@ -55,12 +55,17 @@ class HermesAgentClient:
         self.rotation_attempts = max(1, rotation_attempts)
 
     def _headers(
-        self, profile: str, chat_id: int, *, model: str | None = None
+        self,
+        profile: str,
+        chat_id: int,
+        *,
+        model: str | None = None,
+        session_key: str | None = None,
     ) -> dict[str, str]:
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
-            "X-Hermes-Session-Key": self._session_key(profile, chat_id),
+            "X-Hermes-Session-Key": session_key or self._session_key(profile, chat_id),
         }
         if model:
             # Hermes API server's supported model hot-swap surface.
@@ -150,18 +155,25 @@ class HermesAgentClient:
         chat_id: int,
         user_text: str,
         extra_system: str | None = None,
+        *,
+        conversation_key: str | None = None,
+        store_conversation: bool = True,
     ) -> dict[str, Any]:
         instructions = self.load_system_prompt(profile)
         if extra_system:
             instructions = f"{instructions}\n\n{extra_system}"
 
-        conversation = self._conversation(profile, chat_id)
+        conversation = (
+            _SAFE_KEY.sub("-", conversation_key)[:256]
+            if conversation_key
+            else self._conversation(profile, chat_id)
+        )
         payload = {
             "model": profile,
             "input": user_text,
             "instructions": instructions,
             "conversation": conversation,
-            "store": True,
+            "store": store_conversation,
         }
         url = f"{self._profile_base(profile)}/v1/responses"
 
@@ -192,7 +204,9 @@ class HermesAgentClient:
                         request_payload["provider"] = "custom"
                     response = await client.post(
                         url,
-                        headers=self._headers(profile, chat_id),
+                        headers=self._headers(
+                            profile, chat_id, session_key=conversation
+                        ),
                         json=request_payload,
                     )
                     response.raise_for_status()
@@ -277,19 +291,20 @@ class HermesAgentClient:
 
         text = "\n".join(text_parts).strip()
         response_id = str(data.get("id") or conversation)
-        await self.store.upsert_chat_session(
-            agent_id=profile,
-            chat_id=chat_id,
-            backend="hermes-agent",
-            session_id=response_id,
-            hermes_profile=profile,
-            meta={
-                "conversation": conversation,
-                "tool_calls": len(
-                    [event for event in tool_events if event["type"] == "function_call"]
-                ),
-            },
-        )
+        if store_conversation:
+            await self.store.upsert_chat_session(
+                agent_id=profile,
+                chat_id=chat_id,
+                backend="hermes-agent",
+                session_id=response_id,
+                hermes_profile=profile,
+                meta={
+                    "conversation": conversation,
+                    "tool_calls": len(
+                        [event for event in tool_events if event["type"] == "function_call"]
+                    ),
+                },
+            )
         return {
             "ok": data.get("status") in {None, "completed"},
             "text": text,
