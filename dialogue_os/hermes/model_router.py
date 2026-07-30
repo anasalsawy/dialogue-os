@@ -23,6 +23,15 @@ ROTATABLE_TEXT = (
     "internal server error",
     "timed out",
     "timeout",
+    "api error",
+    "provider error",
+    "runtime error",
+    "authentication error",
+    "request failed",
+    "failed to",
+    "model failed",
+    "service unavailable",
+    "unable to complete",
 )
 
 
@@ -111,7 +120,7 @@ class FeatherlessModelRouter:
 
     @staticmethod
     def should_rotate(*, status: int | None = None, text: str = "") -> bool:
-        if status in ROTATABLE_STATUS:
+        if status is not None and status >= 400:
             return True
         lowered = text.lower()
         return any(marker in lowered for marker in ROTATABLE_TEXT)
