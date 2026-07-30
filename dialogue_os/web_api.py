@@ -67,6 +67,7 @@ def install_war_room_api(app: web.Application, bridge: "BridgeService") -> None:
     app.router.add_get("/api/v1/missions/{mission_id}", _mission)
     app.router.add_get("/api/v1/missions/{mission_id}/events", _mission_events)
     app.router.add_get("/api/v1/events", _canonical_events)
+    app.router.add_get("/api/v1/watcher-audits", _watcher_audits)
     app.router.add_post("/api/v1/commands", _command)
     app.router.add_get("/api/v1/commands/{command_id}", _command_status)
 
@@ -139,6 +140,20 @@ async def _canonical_events(request: web.Request) -> web.Response:
     bridge: BridgeService = request.app["bridge"]
     limit = min(max(int(request.query.get("limit", "100")), 1), 500)
     return web.json_response({"events": await bridge.store.recent_canonical_events(limit)})
+
+
+async def _watcher_audits(request: web.Request) -> web.Response:
+    bridge: BridgeService = request.app["bridge"]
+    limit = min(max(int(request.query.get("limit", "100")), 1), 500)
+    audits = await bridge.store.recent_watcher_audits(limit)
+    return web.json_response(
+        {
+            "audits": audits,
+            "count": len(audits),
+            "lane": bridge.watcher_audit.status(),
+            "source": "dialogue_os_observable_execution",
+        }
+    )
 
 
 async def _command(request: web.Request) -> web.Response:
