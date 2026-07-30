@@ -230,8 +230,10 @@ class Settings(BaseSettings):
     @classmethod
     def _chief_backend(cls, v: Any) -> str:
         value = str(v or "codex").strip().lower()
-        if value not in {"codex", "featherless"}:
-            raise ValueError("CHIEF_BACKEND must be 'codex' or 'featherless'")
+        if value not in {"codex", "featherless", "hermes"}:
+            raise ValueError(
+                "CHIEF_BACKEND must be 'codex', 'featherless', or 'hermes'"
+            )
         return value
 
     @field_validator("hermes_session_scope", mode="before")
