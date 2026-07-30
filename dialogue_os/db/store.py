@@ -334,6 +334,61 @@ class Store:
             ),
         )
 
+    async def add_watcher_audit(self, audit: dict[str, Any]) -> None:
+        """Persist one independent watcher verdict for an execution audit."""
+        await self.execute(
+            """
+            INSERT INTO watcher_audits(
+                audit_id, watcher_id, subject_agent_id, mission_id, verdict,
+                confidence, claim_quote, contradiction, evidence_refs_json,
+                meta_json, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(audit_id, watcher_id) DO UPDATE SET
+                verdict=excluded.verdict,
+                confidence=excluded.confidence,
+                claim_quote=excluded.claim_quote,
+                contradiction=excluded.contradiction,
+                evidence_refs_json=excluded.evidence_refs_json,
+                meta_json=excluded.meta_json
+            """,
+            (
+                audit["audit_id"],
+                audit["watcher_id"],
+                audit["subject_agent_id"],
+                audit.get("mission_id"),
+                audit["verdict"],
+                float(audit.get("confidence") or 0.0),
+                audit.get("claim_quote"),
+                audit.get("contradiction"),
+                json.dumps(audit.get("evidence_refs") or []),
+                json.dumps(audit.get("meta") or {}),
+                time.time(),
+            ),
+        )
+
+    async def recent_watcher_audits(self, limit: int = 100) -> list[dict[str, Any]]:
+        rows = await self.fetchall(
+            """
+            SELECT audit_id, watcher_id, subject_agent_id, mission_id, verdict,
+                   confidence, claim_quote, contradiction, evidence_refs_json,
+                   meta_json, created_at
+            FROM watcher_audits
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        result: list[dict[str, Any]] = []
+        for row in rows:
+            item = {key: row[key] for key in row.keys()}
+            item["evidence_refs"] = json.loads(
+                item.pop("evidence_refs_json") or "[]"
+            )
+            item["meta"] = json.loads(item.pop("meta_json") or "{}")
+            result.append(item)
+        return result
+
     # --- tool runs ---
     async def add_tool_run(self, run: dict[str, Any]) -> None:
         await self.execute(
