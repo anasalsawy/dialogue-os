@@ -21,6 +21,7 @@ if [[ ! -x "${HERMES_BIN}" ]]; then
 fi
 
 profiles=(
+  chief-control
   builder-lead
   research-lead
   operations-lead
@@ -31,6 +32,7 @@ profiles=(
   watcher-beta
 )
 descriptions=(
+  "Chief orchestrator: assigns, supervises, verifies, and remains responsive."
   "Builds and repairs Dialogue-OS, the YTA website, and production services."
   "Researches suppliers, APIs, technical options, and evidence."
   "Runs travel operations, bookings, fulfillment, and incident response."
@@ -58,7 +60,7 @@ python3 "${PROJECT_ROOT}/scripts/build_hermes_souls.py" \
 for index in "${!profiles[@]}"; do
   profile="${profiles[$index]}"
   profile_dir="${HERMES_ROOT}/profiles/${profile}"
-  port="$((8643 + index))"
+  port="$((8642 + index))"
 
   if [[ ! -d "${profile_dir}" ]]; then
     "${HERMES_BIN}" profile create "${profile}" --clone \
@@ -145,7 +147,7 @@ systemctl --user daemon-reload
 profile_urls=()
 for index in "${!profiles[@]}"; do
   profile="${profiles[$index]}"
-  port="$((8643 + index))"
+  port="$((8642 + index))"
   systemctl --user enable --now "dialogue-os-hermes@${profile}.service"
   profile_urls+=("${profile}=http://127.0.0.1:${port}")
 done
