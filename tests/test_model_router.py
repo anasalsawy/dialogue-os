@@ -51,9 +51,8 @@ def test_failure_quarantines_and_success_sticks():
     assert snapshot["profile_models"]["builder-lead"] == "two"
 
 
-def test_only_provider_and_model_errors_rotate():
+def test_any_http_error_and_provider_or_model_error_rotates():
     assert FeatherlessModelRouter.should_rotate(status=500)
+    assert FeatherlessModelRouter.should_rotate(status=400)
     assert FeatherlessModelRouter.should_rotate(text="context too large")
-    assert not FeatherlessModelRouter.should_rotate(
-        status=400, text="tool argument validation failed"
-    )
+    assert FeatherlessModelRouter.should_rotate(text="provider error")

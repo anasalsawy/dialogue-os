@@ -108,7 +108,7 @@ class Settings(BaseSettings):
         default=True, alias="HERMES_MODEL_ROTATION_ENABLED"
     )
     hermes_model_rotation_attempts: int = Field(
-        default=5, alias="HERMES_MODEL_ROTATION_ATTEMPTS"
+        default=25, alias="HERMES_MODEL_ROTATION_ATTEMPTS"
     )
     hermes_model_minimum_context: int = Field(
         default=65_536, alias="HERMES_MODEL_MINIMUM_CONTEXT"
