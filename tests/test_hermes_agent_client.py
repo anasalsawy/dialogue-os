@@ -89,6 +89,54 @@ async def test_real_agent_request_uses_profile_runtime_and_shared_session(
     ]
 
 
+async def test_isolated_request_overrides_header_and_does_not_persist_session(
+    store: Store, monkeypatch
+):
+    clear_proxy_env(monkeypatch)
+    seen = {}
+
+    async def fake_post(self, url, *, headers, json):
+        seen.update(headers=headers, json=json)
+        return httpx.Response(
+            200,
+            request=httpx.Request("POST", url),
+            json={
+                "id": "audit-response",
+                "status": "completed",
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": "{}"}],
+                    }
+                ],
+            },
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+    client = HermesAgentClient(
+        base_url="http://127.0.0.1:8642",
+        api_key="runtime-secret",
+        store=store,
+        session_scope="profile",
+    )
+
+    result = await client.chat(
+        "watcher-alpha",
+        0,
+        "audit",
+        conversation_key="dialogue-os-audit:a1:watcher_alpha",
+        store_conversation=False,
+    )
+
+    assert result["ok"]
+    assert seen["headers"]["X-Hermes-Session-Key"] == (
+        "dialogue-os-audit:a1:watcher_alpha"
+    )
+    assert seen["json"]["conversation"] == "dialogue-os-audit:a1:watcher_alpha"
+    assert seen["json"]["store"] is False
+    assert await store.get_chat_session("watcher-alpha", 0) is None
+
+
 async def test_readiness_rejects_profile_without_tools(store: Store, monkeypatch):
     clear_proxy_env(monkeypatch)
 
