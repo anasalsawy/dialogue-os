@@ -208,3 +208,68 @@ def test_independent_profile_url_takes_precedence(store: Store):
         client._profile_base("research-lead")
         == "http://127.0.0.1:8642/p/research-lead"
     )
+
+
+async def test_rotation_sends_real_model_and_provider_in_request_body(
+    store: Store, monkeypatch
+):
+    clear_proxy_env(monkeypatch)
+    payloads = []
+
+    class Router:
+        failures = []
+        selected = None
+
+        async def candidates(self, profile):
+            return ["broken/model", "working/model"]
+
+        @staticmethod
+        def should_rotate(*, status=None, text=""):
+            return "api call failed" in text.lower()
+
+        def failure(self, model, error):
+            self.failures.append(model)
+
+        def success(self, profile, model):
+            self.selected = model
+
+    async def fake_post(self, url, *, headers, json):
+        payloads.append(dict(json))
+        request = httpx.Request("POST", url)
+        text = "API call failed" if len(payloads) == 1 else "Done"
+        return httpx.Response(
+            200,
+            request=request,
+            json={
+                "id": f"resp_{len(payloads)}",
+                "status": "completed",
+                "output": [
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [{"type": "output_text", "text": text}],
+                    }
+                ],
+            },
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+    router = Router()
+    client = HermesAgentClient(
+        base_url="http://127.0.0.1:8642",
+        api_key="runtime-secret",
+        store=store,
+        profile_urls={"builder-lead": "http://127.0.0.1:8643"},
+        model_router=router,
+    )
+
+    result = await client.chat("builder-lead", 1, "work")
+
+    assert [item["model"] for item in payloads] == [
+        "broken/model",
+        "working/model",
+    ]
+    assert [item["provider"] for item in payloads] == ["custom", "custom"]
+    assert router.failures == ["broken/model"]
+    assert router.selected == "working/model"
+    assert result["text"] == "Done"
