@@ -62,9 +62,27 @@ for index in "${!profiles[@]}"; do
   profile_dir="${HERMES_ROOT}/profiles/${profile}"
   port="$((8642 + index))"
 
-  if [[ ! -d "${profile_dir}" ]]; then
+  if [[ ! -f "${profile_dir}/config.yaml" ]]; then
+    soul_backup=""
+    if [[ -f "${profile_dir}/SOUL.md" ]]; then
+      soul_backup="$(mktemp)"
+      cp "${profile_dir}/SOUL.md" "${soul_backup}"
+      mv "${profile_dir}" "${profile_dir}.incomplete.$(date +%s)"
+    fi
     "${HERMES_BIN}" profile create "${profile}" --clone \
       --description "${descriptions[$index]}" --no-alias
+    if [[ -n "${soul_backup}" ]]; then
+      cp "${soul_backup}" "${profile_dir}/SOUL.md"
+      rm -f "${soul_backup}"
+    fi
+  fi
+
+  # Chief uses the same proven provider configuration as Builder while keeping
+  # its own SOUL, memory, sessions, API port, and runtime process.
+  if [[ "${profile}" == "chief-control" ]] \
+    && [[ -f "${HERMES_ROOT}/profiles/builder-lead/config.yaml" ]]; then
+    cp "${HERMES_ROOT}/profiles/builder-lead/config.yaml" \
+      "${profile_dir}/config.yaml"
   fi
 
   chmod 0600 "${profile_dir}/SOUL.md"
@@ -120,6 +138,44 @@ if marker in config:
     config = config.split(marker, 1)[0].rstrip() + "\n"
 config_path.write_text(config.rstrip() + marker + managed, encoding="utf-8")
 PY
+
+  if [[ "${profile}" == "chief-control" ]] \
+    && [[ -f "${HERMES_ROOT}/profiles/builder-lead/.env" ]]; then
+    CHIEF_ENV="${profile_dir}/.env" \
+      BUILDER_ENV="${HERMES_ROOT}/profiles/builder-lead/.env" \
+      python3 - <<'PY'
+import os
+from pathlib import Path
+
+chief_path = Path(os.environ["CHIEF_ENV"])
+builder_path = Path(os.environ["BUILDER_ENV"])
+prefixes = (
+    "HERMES_CUSTOM_",
+    "FEATHERLESS_",
+    "OPENAI_",
+    "CUSTOM_",
+)
+
+def parse(path):
+    values = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if "=" not in line or line.lstrip().startswith("#"):
+            continue
+        key, value = line.split("=", 1)
+        values[key.strip()] = value
+    return values
+
+chief = parse(chief_path)
+for key, value in parse(builder_path).items():
+    if key.startswith(prefixes):
+        chief[key] = value
+chief_path.write_text(
+    "\n".join(f"{key}={value}" for key, value in chief.items()) + "\n",
+    encoding="utf-8",
+)
+chief_path.chmod(0o600)
+PY
+  fi
 done
 
 service_dir="${HOME}/.config/systemd/user"
