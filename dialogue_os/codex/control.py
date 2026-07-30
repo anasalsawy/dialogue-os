@@ -63,6 +63,8 @@ class ControlDecision:
     error: str | None = None
     cursor_session_id: str | None = None
     duration_seconds: float = 0.0
+    tool_events: list[dict[str, Any]] | None = None
+    model: str | None = None
 
 
 class ControlPlane:
