@@ -327,6 +327,65 @@ class MissionSupervisor:
             await self._maybe_owner_update(mission, state, now=now)
             return outcome
 
+        # Scheduled probes are the deterministic supervision lobe, not Chief
+        # work. Persistent missing acknowledgements, stale heartbeats, stopped
+        # processes, and unsupported claims must not queue dozens of Chief LLM
+        # turns after a restart. Completion verification and explicit/forced
+        # checks still go to Chief.
+        finding_kinds = {finding.kind for finding in findings}
+        routine_scheduled = (
+            reason == "scheduled"
+            and not force
+            and COMPLETION_CLAIM not in finding_kinds
+        )
+        if routine_scheduled:
+            if not unchanged:
+                await self._escalate(mission, state, findings, now=now)
+                instruction = self._routine_instruction(mission, findings)
+                if instruction:
+                    try:
+                        await self.post_office_message(
+                            mission.office_chat_id, instruction
+                        )
+                        outcome.posted = True
+                    except Exception as e:
+                        log.error(
+                            "supervisor_post_failed",
+                            mission_id=mission_id,
+                            error=redact_text(str(e)),
+                        )
+                    await self.missions.add_event(
+                        mission_id,
+                        "deterministic_supervision",
+                        actor_agent_id="supervisor",
+                        text=instruction,
+                        evidence={
+                            "reason": reason,
+                            "findings": outcome.finding_kinds,
+                        },
+                    )
+            state = await self.supervision.update(
+                mission_id,
+                last_checked_at=now,
+                consecutive_no_change=(
+                    state.consecutive_no_change + 1 if unchanged else 0
+                ),
+                state_fingerprint=fingerprint,
+            )
+            outcome.next_check_at = await self.supervision.schedule_next(
+                mission_id, cadence=self._cadence_for(mission, state, probe)
+            )
+            await self._maybe_owner_update(mission, state, now=now)
+            log.info(
+                "supervision_inspected",
+                mission_id=mission_id,
+                reason=reason,
+                findings=outcome.finding_kinds,
+                posted=outcome.posted,
+                chief_invoked=False,
+            )
+            return outcome
+
         await self._escalate(mission, state, findings, now=now)
 
         decision_text = await self._ask_chief(mission, state, probe, findings, reason=reason)
@@ -637,16 +696,9 @@ class MissionSupervisor:
                 source="supervisor",
             )
 
-        if UNSUPPORTED_CLAIM in kinds and self.notify_watcher:
-            await self.notify_watcher(
-                self.watcher_agent_id,
-                (
-                    f"Mission {mission.mission_id[:8]} ({mission.department}, "
-                    f"specialist={mission.specialist_agent_id}) has made "
-                    f"{state.unsupported_claims} completion claims without inspectable evidence."
-                ),
-                "critical",
-            )
+        # Unsupported claims are audit inputs, not watcher alerts. The
+        # evidence-bound Alpha+Beta lane decides whether a contradiction is
+        # deception; this deterministic supervisor must never impersonate it.
 
         if state.blocker and state.blocker_requires_owner and self.notify_owner:
             await self.notify_owner(
@@ -654,6 +706,33 @@ class MissionSupervisor:
                 f"Required: {state.blocker}"
             )
             await self.supervision.update(mission.mission_id, last_owner_update_at=now)
+
+    @staticmethod
+    def _routine_instruction(
+        mission: Mission, findings: list[Finding]
+    ) -> str | None:
+        """Evidence-only follow-up that does not spend a Chief model turn."""
+        kinds = {finding.kind for finding in findings}
+        requests: list[str] = []
+        if MISSING_ACK in kinds:
+            requests.append("acknowledge the mission and state your initial plan")
+        if STALE_HEARTBEAT in kinds:
+            requests.append(
+                "report your current action, active tool/process, progress, and next action"
+            )
+        if PROCESS_EXITED in kinds or PROCESS_STUCK in kinds:
+            requests.append("provide the process status, exit code, and relevant logs")
+        if BLOCKER_RAISED in kinds:
+            requests.append("state the blocker and the exact requirement to unblock it")
+        if UNSUPPORTED_CLAIM in kinds:
+            requests.append("provide inspectable artifacts or test/runtime evidence")
+        if not requests:
+            return None
+        return (
+            f"Automated supervision · mission {mission.mission_id[:8]}: "
+            + "; ".join(requests)
+            + ". Do not claim completion without concrete evidence."
+        )
 
     async def _maybe_owner_update(
         self, mission: Mission, state: SupervisionState, *, now: float
