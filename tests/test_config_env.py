@@ -1,4 +1,5 @@
 from dialogue_os.config import Settings
+import pytest
 
 
 def test_comma_separated_tuple_settings_from_environment(monkeypatch):
@@ -26,3 +27,13 @@ def test_comma_separated_tuple_settings_from_environment(monkeypatch):
         "https://one.example",
         "https://two.example",
     )
+
+
+def test_chief_backend_accepts_hermes():
+    settings = Settings(_env_file=None, CHIEF_BACKEND="hermes")
+    assert settings.chief_backend == "hermes"
+
+
+def test_chief_backend_rejects_unknown_backend():
+    with pytest.raises(ValueError):
+        Settings(_env_file=None, CHIEF_BACKEND="pretend")

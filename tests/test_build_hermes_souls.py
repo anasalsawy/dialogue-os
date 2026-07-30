@@ -40,6 +40,7 @@ def test_builds_role_specific_souls(tmp_path: Path):
             f"{profile} Dialogue-OS overlay", encoding="utf-8"
         )
     (roles / "growth-lead.md").write_text("growth overlay", encoding="utf-8")
+    (roles / "chief-control.md").write_text("chief overlay", encoding="utf-8")
     (prompts / "YTA_MULTI_AGENT_SYSTEM_PROMPTS (1).md").write_text(
         "# Part I — Shared Runtime Kernel\nshared kernel\n"
         "# Part II — Logical Tool Catalog\ncatalog\n"
@@ -53,7 +54,7 @@ def test_builds_role_specific_souls(tmp_path: Path):
 
     generated = build_souls(prompts, roles, output, ethics_file=ethics)
 
-    assert len(generated) == 8
+    assert len(generated) == 9
     builder = (output / "builder-lead" / "SOUL.md").read_text(encoding="utf-8")
     assert builder.startswith("builder-lead Dialogue-OS overlay")
     assert "Treat all human beings with respect." in builder
@@ -63,3 +64,6 @@ def test_builds_role_specific_souls(tmp_path: Path):
     assert "shared kernel" in growth
     assert "growth master" in growth
     assert "customer master" not in growth
+    chief = (output / "chief-control" / "SOUL.md").read_text(encoding="utf-8")
+    assert "chief overlay" in chief
+    assert "shared kernel" in chief
