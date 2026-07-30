@@ -38,7 +38,7 @@ class HermesAgentClient:
         multiplex_profiles: bool = True,
         profile_urls: dict[str, str] | None = None,
         model_router: FeatherlessModelRouter | None = None,
-        rotation_attempts: int = 5,
+        rotation_attempts: int = 25,
     ):
         if session_scope not in {"chat", "profile"}:
             raise ValueError("session_scope must be 'chat' or 'profile'")
@@ -184,12 +184,16 @@ class HermesAgentClient:
         async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
             for selected_model in candidates:
                 try:
+                    request_payload = dict(payload)
+                    if selected_model:
+                        # Hermes honors an explicit provider+model request. A
+                        # custom header alone is ignored by many releases.
+                        request_payload["model"] = selected_model
+                        request_payload["provider"] = "custom"
                     response = await client.post(
                         url,
-                        headers=self._headers(
-                            profile, chat_id, model=selected_model
-                        ),
-                        json=payload,
+                        headers=self._headers(profile, chat_id),
+                        json=request_payload,
                     )
                     response.raise_for_status()
                     candidate_data = response.json()
