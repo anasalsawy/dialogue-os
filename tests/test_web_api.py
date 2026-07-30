@@ -14,6 +14,15 @@ class StubStore:
     async def recent_canonical_events(self, limit):
         return [{"event_id": "e1", "event_type": "verified"}][:limit]
 
+    async def recent_watcher_audits(self, limit):
+        return [
+            {
+                "audit_id": "a1",
+                "watcher_id": "watcher_alpha",
+                "verdict": "CLEAR",
+            }
+        ][:limit]
+
 
 class StubSessions:
     async def get_primary(self):
@@ -30,6 +39,12 @@ class StubBridge:
         self.sessions = StubSessions()
         self.bots = {}
         self.hermes = object()
+        self.watcher_audit = SimpleNamespace(
+            status=lambda: {
+                "enabled": True,
+                "consensus_required": True,
+            }
+        )
 
     async def status_dict(self):
         return {"ok": True}
@@ -66,3 +81,16 @@ async def test_rejects_unapproved_cors_preflight(client):
         "/api/v1/status", headers={"Origin": "https://evil.example"}
     )
     assert response.status == 403
+
+
+async def test_watcher_audits_are_exposed_as_runtime_truth(client):
+    response = await client.get(
+        "/api/v1/watcher-audits",
+        headers={"Authorization": "Bearer secret"},
+    )
+    assert response.status == 200
+    payload = await response.json()
+    assert payload["source"] == "dialogue_os_observable_execution"
+    assert payload["count"] == 1
+    assert payload["audits"][0]["verdict"] == "CLEAR"
+    assert payload["lane"]["consensus_required"] is True
