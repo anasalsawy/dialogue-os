@@ -194,9 +194,11 @@ async def test_detects_missing_acknowledgement(tracker: MissionTracker, harness:
     )
 
     assert MISSING_ACK in outcome.finding_kinds
-    assert outcome.cursor_invoked and outcome.posted
+    assert outcome.cursor_invoked is False
+    assert outcome.posted
     assert harness.posts[-1][0] == OFFICE_CHAT
-    assert "acknowledgement" in harness.last_prompt.lower()
+    assert "acknowledge" in harness.posts[-1][1].lower()
+    harness.control.chief_direct.assert_not_awaited()
     state = await harness.supervisor.supervision.get(mission.mission_id)
     assert state.ack_followups == 1
 
@@ -254,7 +256,7 @@ async def test_detects_dead_process_and_collects_logs(
     assert outcome.posted
     logs = await harness.supervisor.supervision.recent_logs(mission.mission_id)
     assert any("exited" in entry["message"] for entry in logs)
-    assert "exit status" in harness.last_prompt.lower()
+    assert "exit code" in harness.posts[-1][1].lower()
 
 
 async def test_detects_blocker_and_escalates_to_owner(
@@ -277,7 +279,7 @@ async def test_detects_blocker_and_escalates_to_owner(
     assert "Browserbase" in harness.owner[-1]
 
 
-async def test_repeated_unsupported_claims_alert_watcher(
+async def test_repeated_unsupported_claims_do_not_bypass_watcher_consensus(
     tracker: MissionTracker, harness: Harness
 ):
     mission = await _assigned_mission(tracker, harness.supervisor)
@@ -294,11 +296,10 @@ async def test_repeated_unsupported_claims_alert_watcher(
         mission, text="Finished now, trust me, everything is complete"
     )
 
-    assert harness.watcher, "the watcher must hear about repeated empty claims"
-    watcher_id, summary, severity = harness.watcher[-1]
-    assert watcher_id == "watcher_alpha"
-    assert severity == "critical"
-    assert mission.mission_id[:8] in summary
+    assert not harness.watcher, (
+        "the deterministic supervisor must not manufacture a watcher alert; "
+        "the Alpha+Beta audit lane owns deception findings"
+    )
 
 
 async def test_completion_claim_requires_chief_verification(
