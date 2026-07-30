@@ -76,7 +76,7 @@ class HermesAgentClient:
 
     def _session_key(self, profile: str, chat_id: int) -> str:
         transport = "shared" if self.session_scope == "profile" else str(chat_id)
-        return _SAFE_KEY.sub("-", f"dialogue-os:{profile}:{transport}")[:256]
+        return _SAFE_KEY.sub("-", f"dialogue-os-v3:{profile}:{transport}")[:256]
 
     def _conversation(self, profile: str, chat_id: int) -> str:
         return self._session_key(profile, chat_id)

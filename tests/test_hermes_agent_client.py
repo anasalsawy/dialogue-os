@@ -78,9 +78,9 @@ async def test_real_agent_request_uses_profile_runtime_and_shared_session(
         "http://127.0.0.1:8642/p/builder-lead/v1/responses"
     )
     assert seen["headers"]["X-Hermes-Session-Key"] == (
-        "dialogue-os:builder-lead:shared"
+        "dialogue-os-v3:builder-lead:shared"
     )
-    assert seen["json"]["conversation"] == "dialogue-os:builder-lead:shared"
+    assert seen["json"]["conversation"] == "dialogue-os-v3:builder-lead:shared"
     assert result["backend"] == "hermes-agent"
     assert result["text"] == "Done"
     assert [event["type"] for event in result["tool_events"]] == [
