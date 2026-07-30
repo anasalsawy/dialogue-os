@@ -245,6 +245,60 @@ async def test_watcher_default_silence(store: Store, tmp_path: Path):
 
 
 @pytest.mark.asyncio
+async def test_watcher_alert_is_persisted_but_not_sent_by_default(
+    store: Store, tmp_path: Path
+):
+    ch = CanonicalChannel(store, tmp_path / "e.jsonl", None)
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    watcher = WatcherService(store, ch)
+
+    alert = await watcher.private_alert_to_chief(
+        watcher_id="watcher_alpha",
+        summary="provider error on model/example",
+        chief_bot=bot,
+        owner_chat_id=42,
+    )
+
+    bot.send_message.assert_not_awaited()
+    assert alert["meta"]["telegram_suppressed"]
+    row = await store.fetchone(
+        "SELECT watcher_id FROM watcher_alerts WHERE alert_id=?",
+        (alert["alert_id"],),
+    )
+    assert row["watcher_id"] == "watcher_alpha"
+
+
+@pytest.mark.asyncio
+async def test_enabled_watcher_alert_delivery_is_deduplicated(
+    store: Store, tmp_path: Path
+):
+    ch = CanonicalChannel(store, tmp_path / "e.jsonl", None)
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    watcher = WatcherService(
+        store, ch, telegram_delivery_enabled=True, cooldown_seconds=3600
+    )
+
+    first = await watcher.private_alert_to_chief(
+        watcher_id="watcher_alpha",
+        summary="provider error on broken/model-one",
+        chief_bot=bot,
+        owner_chat_id=42,
+    )
+    second = await watcher.private_alert_to_chief(
+        watcher_id="watcher_alpha",
+        summary="provider error on other/model-two",
+        chief_bot=bot,
+        owner_chat_id=42,
+    )
+
+    assert bot.send_message.await_count == 1
+    assert first["meta"]["telegram_delivered"]
+    assert second["meta"]["duplicate_within_cooldown"]
+
+
+@pytest.mark.asyncio
 async def test_unaddressed_selection_prefers_silence(store: Store):
     orch = Orchestrator(store)
     r = orch.select_for_unaddressed("hello there", [])
