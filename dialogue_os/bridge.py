@@ -230,7 +230,12 @@ class BridgeService:
             self.settings.telegram_canonical_channel_id,
             publisher_bot=chief,
         )
-        self.watchers = WatcherService(self.store, self.canonical)
+        self.watchers = WatcherService(
+            self.store,
+            self.canonical,
+            telegram_delivery_enabled=self.settings.watcher_telegram_alerts_enabled,
+            cooldown_seconds=self.settings.watcher_alert_cooldown_seconds,
+        )
 
         # Ensure primary Codex session exists early
         try:

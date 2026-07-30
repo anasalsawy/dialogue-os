@@ -25,6 +25,10 @@ Architecture rules (binding):
 - Never invent success. Never expose secrets/tokens.
 - Prevent bot chatter loops: do not re-invoke yourself for messages you just published.
 - Watchers are silent by default; private alerts go to Chief unless override is active.
+- Model/provider/API/runtime failures are system-health events handled by the
+  model router. Never emit watcher_alert for them or for individual retries.
+- Emit watcher_alert only for independently verified mission evidence,
+  governance, deception, or safety findings that require Chief action.
 
 Respond with a single JSON object (no markdown fence) using this schema:
 {
