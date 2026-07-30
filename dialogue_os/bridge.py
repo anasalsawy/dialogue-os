@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import re
 import signal
 import time
 import uuid
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +47,14 @@ from dialogue_os.offices.registry import DEPARTMENTS, OfficeError, OfficeRegistr
 from dialogue_os.telegram.api import TelegramBot, TypingKeepalive
 from dialogue_os.util.logging import configure_logging, get_logger
 from dialogue_os.util.redact import redact_text
+from dialogue_os.watchers.audit import (
+    AUDIT_PROFILES,
+    AuditEnvelope,
+    WatcherAuditLane,
+    build_audit_prompt,
+    deception_consensus,
+    parse_watcher_verdict,
+)
 from dialogue_os.watchers.service import WatcherService
 from dialogue_os.web_api import install_war_room_api
 
@@ -125,6 +135,10 @@ class BridgeService:
         self.control = ControlPlane(self.sessions, self.store)
         self.chief_control = _ChiefControlRouter(self)
         self.chief_lane = ChiefLane(self._execute_chief_prompt)
+        self.watcher_audit = WatcherAuditLane(
+            self._execute_watcher_audit,
+            enabled=self.settings.hermes_backend == "agent_api",
+        )
         self.orchestrator = Orchestrator(self.store)
         self.offices = OfficeRegistry(self.store, self.settings.telegram_owner_id)
         self.missions = MissionTracker(self.store)
@@ -244,6 +258,9 @@ class BridgeService:
         except Exception as e:
             log.error("codex_session_init_failed", error=redact_text(str(e)))
         self._tasks.append(self.chief_lane.start())
+        audit_task = self.watcher_audit.start()
+        if audit_task:
+            self._tasks.append(audit_task)
 
         await self._start_health()
 
@@ -441,6 +458,7 @@ class BridgeService:
             "offices_unregistered": await self.offices.unregistered_departments(),
             "open_missions": len(await self.missions.list_open()),
             "chief_lane": self.chief_lane.status(),
+            "watcher_audit": self.watcher_audit.status(),
             "azure_llm_disabled": self.settings.azure_llm_disabled,
             "canonical_channel_id": self.settings.telegram_canonical_channel_id,
             "war_room_api": {
@@ -460,6 +478,7 @@ class BridgeService:
     async def stop(self) -> None:
         self._stopping = True
         await self.chief_lane.stop()
+        await self.watcher_audit.stop()
         for t in self._tasks:
             t.cancel()
         await asyncio.gather(*self._tasks, return_exceptions=True)
@@ -723,14 +742,28 @@ class BridgeService:
                 decision.text = (
                     f"{decision.text}\n\n{summary}" if decision.text else summary
                 )
-        return {
+        result = {
             "ok": bool(decision.ok),
             "text": decision.text or "",
             "assignments": assignments,
             "cursor_session_id": decision.cursor_session_id,
             "duration_seconds": decision.duration_seconds,
             "error": redact_text(decision.error or "") or None,
+            "tool_events": decision.tool_events or [],
+            "model": decision.model,
         }
+        await self._submit_agent_audit(
+            agent_id="chief",
+            profile=(
+                "chief-control"
+                if self.settings.chief_backend == "hermes"
+                else "codex-control"
+            ),
+            input_text=prompt,
+            result=result,
+            assignments=assignments,
+        )
+        return result
 
     async def _chief_direct(self, prompt: str) -> ControlDecision:
         """Run Chief through its genuine Hermes profile when configured."""
@@ -757,6 +790,8 @@ class BridgeService:
             error=result.get("error"),
             cursor_session_id=result.get("session_id"),
             raw_text=str(result.get("text") or ""),
+            tool_events=result.get("tool_events") or [],
+            model=result.get("model"),
         )
 
     async def _chief_prompt_with_auth_boundary(self, text: str, admin_authorized: bool) -> str:
@@ -833,6 +868,13 @@ class BridgeService:
             await self._send(bot, chat_id, f"Hermes error: {result.get('error')}", reply_to=reply_to)
             return
         out = result.get("text") or ""
+        await self._submit_agent_audit(
+            agent_id=bot.agent_id,
+            profile=profile,
+            input_text=text,
+            result=result,
+            mission_id=mission_id,
+        )
         if out == "" and self.watchers and self.watchers.is_watcher(bot.agent_id):
             return
         if out:
@@ -851,6 +893,337 @@ class BridgeService:
                     )
                 except Exception as e:
                     log.error("supervision_ingest_failed", error=redact_text(str(e)))
+
+    @staticmethod
+    def _audit_text(value: Any, limit: int = 6000) -> str:
+        """Redact and bound one observable evidence value."""
+        if isinstance(value, str):
+            rendered = value
+        else:
+            try:
+                rendered = json.dumps(value, ensure_ascii=False, default=str)
+            except (TypeError, ValueError):
+                rendered = str(value)
+        rendered = redact_text(rendered)
+        if len(rendered) <= limit:
+            return rendered
+        return rendered[:limit] + f"\n[TRUNCATED {len(rendered) - limit} CHARS]"
+
+    async def _submit_agent_audit(
+        self,
+        *,
+        agent_id: str,
+        profile: str,
+        input_text: str,
+        result: dict[str, Any],
+        mission_id: str | None = None,
+        assignments: list[dict[str, Any]] | None = None,
+    ) -> None:
+        """Queue successful non-watcher work without delaying its response."""
+        if agent_id in {"watcher_alpha", "watcher_beta"}:
+            return
+        if not result.get("ok"):
+            # Runtime/provider failures are health signals, not deception.
+            return
+        output_text = str(result.get("text") or "")
+        tool_events = tuple(
+            event
+            for event in (result.get("tool_events") or [])
+            if isinstance(event, dict)
+        )
+        assignment_items = tuple(
+            item for item in (assignments or []) if isinstance(item, dict)
+        )
+        if not output_text and not tool_events and not assignment_items:
+            return
+        await self.watcher_audit.submit(
+            AuditEnvelope(
+                agent_id=agent_id,
+                profile=profile,
+                input_text=self._audit_text(input_text, 12_000),
+                output_text=self._audit_text(output_text, 24_000),
+                model=(
+                    str(result.get("model")) if result.get("model") is not None else None
+                ),
+                session_id=(
+                    str(
+                        result.get("session_id")
+                        or result.get("cursor_session_id")
+                        or ""
+                    )
+                    or None
+                ),
+                mission_id=mission_id,
+                tool_events=tool_events,
+                assignments=assignment_items,
+            )
+        )
+
+    async def _observable_audit_trace(
+        self, envelope: AuditEnvelope
+    ) -> tuple[dict[str, Any], set[str]]:
+        """Collect the evidence both independent watchers are allowed to cite."""
+        trace: dict[str, Any] = {
+            "tool_events": [],
+            "mission": None,
+            "mission_events": [],
+            "artifacts": [],
+            "logs": [],
+            "canonical_events": [],
+        }
+        allowed_refs: set[str] = set()
+
+        # Bound the most recent tool activity so audit calls remain below the
+        # model context window while retaining terminal/browser result evidence.
+        for index, event in enumerate(envelope.tool_events[-16:]):
+            evidence_id = f"tool:{index}"
+            citable = bool(
+                event.get("type") == "function_call_output"
+                or (
+                    event.get("output") is not None
+                    and event.get("output") != ""
+                )
+            )
+            if citable:
+                allowed_refs.add(evidence_id)
+            trace["tool_events"].append(
+                {
+                    "evidence_id": evidence_id,
+                    "citable": citable,
+                    "type": event.get("type"),
+                    "name": event.get("name"),
+                    "call_id": event.get("call_id"),
+                    "arguments": self._audit_text(event.get("arguments") or "", 3000),
+                    "output": self._audit_text(event.get("output") or "", 6000),
+                }
+            )
+
+        if envelope.mission_id:
+            mission = await self.missions.get(envelope.mission_id)
+            if mission:
+                evidence_id = "mission:state"
+                allowed_refs.add(evidence_id)
+                trace["mission"] = {
+                    "evidence_id": evidence_id,
+                    **asdict(mission),
+                }
+                events = (await self.missions.events(envelope.mission_id, limit=200))[-16:]
+                for index, event in enumerate(events):
+                    ref = f"mission_event:{index}"
+                    allowed_refs.add(ref)
+                    trace["mission_events"].append(
+                        {
+                            "evidence_id": ref,
+                            "event_type": event.get("event_type"),
+                            "actor_agent_id": event.get("actor_agent_id"),
+                            "text": self._audit_text(event.get("text") or "", 2500),
+                            "evidence": self._audit_text(
+                                event.get("evidence") or {}, 2500
+                            ),
+                            "created_at": event.get("created_at"),
+                        }
+                    )
+
+                for index, artifact in enumerate(
+                    await self.supervision.artifacts(envelope.mission_id, limit=12)
+                ):
+                    ref = f"artifact:{index}"
+                    allowed_refs.add(ref)
+                    trace["artifacts"].append(
+                        {
+                            "evidence_id": ref,
+                            "kind": artifact.get("kind"),
+                            "path": self._audit_text(artifact.get("path") or "", 2000),
+                            "detail": self._audit_text(
+                                artifact.get("detail") or "", 3000
+                            ),
+                            "meta": self._audit_text(artifact.get("meta") or {}, 2500),
+                            "created_at": artifact.get("created_at"),
+                        }
+                    )
+
+                for index, entry in enumerate(
+                    await self.supervision.recent_logs(envelope.mission_id, limit=12)
+                ):
+                    ref = f"log:{index}"
+                    allowed_refs.add(ref)
+                    trace["logs"].append(
+                        {
+                            "evidence_id": ref,
+                            "level": entry.get("level"),
+                            "source": entry.get("source"),
+                            "message": self._audit_text(
+                                entry.get("message") or "", 3000
+                            ),
+                            "created_at": entry.get("created_at"),
+                        }
+                    )
+
+        canonical = await self.store.recent_canonical_events(limit=30)
+        relevant = [
+            event
+            for event in canonical
+            if event.get("agent_id") == envelope.agent_id
+            or (
+                envelope.mission_id
+                and event.get("task_id") == envelope.mission_id
+            )
+        ][:12]
+        for index, event in enumerate(relevant):
+            ref = f"canonical:{index}"
+            allowed_refs.add(ref)
+            trace["canonical_events"].append(
+                {
+                    "evidence_id": ref,
+                    "event_type": event.get("event_type"),
+                    "agent_id": event.get("agent_id"),
+                    "summary": self._audit_text(event.get("summary") or "", 3000),
+                    "evidence": self._audit_text(
+                        event.get("evidence") or {}, 3000
+                    ),
+                    "task_id": event.get("task_id"),
+                    "created_at": event.get("created_at"),
+                }
+            )
+        return trace, allowed_refs
+
+    async def _execute_watcher_audit(
+        self, envelope: AuditEnvelope
+    ) -> dict[str, Any]:
+        """Run two isolated reviews and publish only corroborated deception."""
+        if not isinstance(self.hermes, HermesAgentClient):
+            return {"consensus": False, "skipped": "Hermes Agent API unavailable"}
+
+        trace, allowed_refs = await self._observable_audit_trace(envelope)
+
+        async def review(watcher_id: str, profile: str) -> tuple[Any, dict[str, Any]]:
+            prompt = build_audit_prompt(
+                watcher_id=watcher_id,
+                envelope=envelope,
+                trace=trace,
+            )
+            try:
+                result = await self.hermes.chat(
+                    profile=profile,
+                    chat_id=0,
+                    user_text=prompt,
+                    conversation_key=f"dialogue-os-audit:{envelope.audit_id}:{watcher_id}",
+                    store_conversation=False,
+                )
+            except Exception as exc:
+                result = {
+                    "ok": False,
+                    "text": "",
+                    "error": redact_text(str(exc)),
+                    "model": None,
+                }
+            verdict = parse_watcher_verdict(
+                watcher_id,
+                str(result.get("text") or ""),
+                agent_output=envelope.output_text,
+                allowed_evidence_refs=allowed_refs,
+            )
+            await self.store.add_watcher_audit(
+                {
+                    "audit_id": envelope.audit_id,
+                    "watcher_id": watcher_id,
+                    "subject_agent_id": envelope.agent_id,
+                    "mission_id": envelope.mission_id,
+                    "verdict": verdict.verdict,
+                    "confidence": verdict.confidence,
+                    "claim_quote": verdict.claim_quote,
+                    "contradiction": verdict.contradiction,
+                    "evidence_refs": list(verdict.evidence_refs),
+                    "meta": {
+                        "valid": verdict.valid,
+                        "reason": verdict.reason,
+                        "review_model": result.get("model"),
+                        "runtime_ok": bool(result.get("ok")),
+                        "runtime_error": redact_text(str(result.get("error") or ""))
+                        or None,
+                        "subject_profile": envelope.profile,
+                        "subject_model": envelope.model,
+                        "subject_session_id": envelope.session_id,
+                    },
+                }
+            )
+            return verdict, result
+
+        reviewed = await asyncio.gather(
+            *(
+                review(watcher_id, profile)
+                for watcher_id, profile in AUDIT_PROFILES.items()
+            )
+        )
+        alpha, beta = reviewed[0][0], reviewed[1][0]
+        consensus = deception_consensus(alpha, beta)
+        if not consensus:
+            log.info(
+                "watcher_audit_completed",
+                audit_id=envelope.audit_id,
+                subject=envelope.agent_id,
+                alpha=alpha.verdict,
+                beta=beta.verdict,
+                consensus=False,
+            )
+            return {
+                "audit_id": envelope.audit_id,
+                "consensus": False,
+                "verdicts": [alpha.as_dict(), beta.as_dict()],
+            }
+
+        shared_refs = sorted(set(alpha.evidence_refs) & set(beta.evidence_refs))
+        summary = (
+            f"Two independent watchers confirmed a contradiction in "
+            f"{envelope.agent_id}'s claim: {alpha.claim_quote}"
+        )
+        evidence = {
+            "audit_id": envelope.audit_id,
+            "subject_agent_id": envelope.agent_id,
+            "mission_id": envelope.mission_id,
+            "claim_quote": alpha.claim_quote,
+            "shared_evidence_refs": shared_refs,
+            "alpha": alpha.as_dict(),
+            "beta": beta.as_dict(),
+        }
+        if self.canonical:
+            await self.canonical.broadcast(
+                agent_id="watcher_consensus",
+                event_type="deception_confirmed",
+                summary=summary,
+                evidence=evidence,
+                task_id=envelope.mission_id,
+                run_id=envelope.audit_id,
+                publish_telegram=False,
+            )
+        if envelope.mission_id and await self.missions.get(envelope.mission_id):
+            await self.missions.add_event(
+                envelope.mission_id,
+                "watcher_deception_confirmed",
+                actor_agent_id="watcher_consensus",
+                text=summary,
+                evidence=evidence,
+            )
+        if self.watchers:
+            await self.watchers.private_alert_to_chief(
+                watcher_id="watcher_consensus",
+                summary=summary,
+                chief_bot=self.bots.get("chief"),
+                owner_chat_id=self.settings.telegram_owner_id,
+                severity="critical",
+                meta=evidence,
+            )
+        log.warning(
+            "watcher_deception_consensus",
+            audit_id=envelope.audit_id,
+            subject=envelope.agent_id,
+            mission_id=envelope.mission_id,
+        )
+        return {
+            "audit_id": envelope.audit_id,
+            "consensus": True,
+            "verdicts": [alpha.as_dict(), beta.as_dict()],
+        }
 
     async def _specialist_office_turn(
         self,
@@ -1635,6 +2008,13 @@ class BridgeService:
                     text = f"Hermes error: {result.get('error')}"
                 else:
                     text = result.get("text") or ""
+                    await self._submit_agent_audit(
+                        agent_id=destination,
+                        profile=profile,
+                        input_text=decision.hermes_prompt or event.get("text") or "",
+                        result=result,
+                        mission_id=event.get("mission_id"),
+                    )
                     # Empty Hermes text is OK for watchers
                     if text == "" and self.watchers and self.watchers.is_watcher(destination):
                         return
