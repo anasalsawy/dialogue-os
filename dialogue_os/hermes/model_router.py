@@ -53,11 +53,13 @@ class FeatherlessModelRouter:
         minimum_context: int = 65_536,
         max_candidates: int = 200,
         refresh_seconds: int = 3600,
+        api_key: str | None = None,
     ):
         self.catalog_url = catalog_url
         self.minimum_context = minimum_context
         self.max_candidates = max_candidates
         self.refresh_seconds = refresh_seconds
+        self.api_key = api_key
         self._models: list[str] = []
         self._states: dict[str, ModelState] = {}
         self._profile_model: dict[str, str] = {}
@@ -77,18 +79,73 @@ class FeatherlessModelRouter:
                 "per_page": str(min(self.max_candidates, 100)),
             }
             async with httpx.AsyncClient(timeout=30, trust_env=False) as client:
-                response = await client.get(self.catalog_url, params=params)
+                headers = (
+                    {"Authorization": f"Bearer {self.api_key}"}
+                    if self.api_key
+                    else None
+                )
+                response = await client.get(
+                    self.catalog_url, params=params, headers=headers
+                )
                 response.raise_for_status()
                 payload = response.json()
-            rows = payload.get("data") if isinstance(payload, dict) else []
-            self._models = [
-                str(row["id"])
-                for row in rows or []
-                if isinstance(row, dict)
-                and row.get("id")
-                and int(row.get("context_length") or 0) >= self.minimum_context
-                and int(row.get("max_completion_tokens") or 4096) >= 4096
-            ][: self.max_candidates]
+            if isinstance(payload, list):
+                rows = payload
+            elif isinstance(payload, dict):
+                rows = payload.get("data") or payload.get("models") or []
+            else:
+                rows = []
+
+            eligible: list[str] = []
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                model_id = row.get("id") or row.get("model_id") or row.get("name")
+                if not model_id:
+                    continue
+                context_value = next(
+                    (
+                        row.get(key)
+                        for key in (
+                            "context_length",
+                            "context_window",
+                            "max_context_length",
+                            "context_length_max",
+                        )
+                        if row.get(key) is not None
+                    ),
+                    None,
+                )
+                completion_value = next(
+                    (
+                        row.get(key)
+                        for key in (
+                            "max_completion_tokens",
+                            "max_output_tokens",
+                            "output_token_limit",
+                        )
+                        if row.get(key) is not None
+                    ),
+                    4096,
+                )
+                # The request already applies context_length_min server-side.
+                # Some catalog variants omit that field in each returned row;
+                # do not turn a valid filtered result into an empty radio dial.
+                try:
+                    context_length = (
+                        self.minimum_context
+                        if context_value is None
+                        else int(context_value)
+                    )
+                    completion_tokens = int(completion_value)
+                except (TypeError, ValueError):
+                    continue
+                if (
+                    context_length >= self.minimum_context
+                    and completion_tokens >= 4096
+                ):
+                    eligible.append(str(model_id))
+            self._models = eligible[: self.max_candidates]
             self._last_refresh = now
             return list(self._models)
 

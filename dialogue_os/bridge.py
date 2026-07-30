@@ -72,7 +72,14 @@ class _ChiefControlRouter:
         self.bridge = bridge
 
     async def chief_direct(self, prompt: str, **_: Any) -> ControlDecision:
-        return await self.bridge._chief_direct(prompt)
+        # Automated supervision must never consume or corrupt the operator's
+        # persistent Chief conversation. Each check gets an isolated,
+        # non-stored Hermes turn.
+        return await self.bridge._chief_direct(
+            prompt,
+            conversation_key=f"dialogue-os-supervision:{uuid.uuid4().hex}",
+            store_conversation=False,
+        )
 
 
 class BridgeService:
@@ -175,6 +182,10 @@ class BridgeService:
                     self.model_router = FeatherlessModelRouter(
                         catalog_url=self.settings.hermes_model_catalog_url,
                         minimum_context=self.settings.hermes_model_minimum_context,
+                        api_key=(
+                            self.settings.chief_featherless_api_key
+                            or self.settings.hermes_api_key
+                        ),
                     )
                 self.hermes = HermesAgentClient(
                     base_url=self.settings.hermes_agent_api_url or "",
@@ -765,7 +776,13 @@ class BridgeService:
         )
         return result
 
-    async def _chief_direct(self, prompt: str) -> ControlDecision:
+    async def _chief_direct(
+        self,
+        prompt: str,
+        *,
+        conversation_key: str | None = None,
+        store_conversation: bool = True,
+    ) -> ControlDecision:
         """Run Chief through its genuine Hermes profile when configured."""
         if self.settings.chief_backend != "hermes":
             return await self.control.chief_direct(prompt)
@@ -781,6 +798,12 @@ class BridgeService:
             "chief-control",
             self.settings.telegram_owner_id or 0,
             prompt,
+            # v2 deliberately abandons the old shared Chief session that was
+            # filled with historical supervision prompts and now returns 500.
+            conversation_key=(
+                conversation_key or "dialogue-os-chief-control:operator-v2"
+            ),
+            store_conversation=store_conversation,
         )
         return ControlDecision(
             action="respond",

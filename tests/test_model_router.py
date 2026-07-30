@@ -6,7 +6,8 @@ from dialogue_os.hermes.model_router import FeatherlessModelRouter
 
 
 async def test_catalog_filters_short_context_and_completion(monkeypatch):
-    async def fake_get(self, url, *, params):
+    async def fake_get(self, url, *, params, headers):
+        assert headers is None
         request = httpx.Request("GET", url)
         return httpx.Response(
             200,
@@ -36,6 +37,37 @@ async def test_catalog_filters_short_context_and_completion(monkeypatch):
     router = FeatherlessModelRouter()
 
     assert await router.candidates("research-lead") == ["good/model"]
+
+
+async def test_catalog_accepts_plan_filtered_rows_with_alternate_schema(monkeypatch):
+    async def fake_get(self, url, *, params, headers):
+        assert params["context_length_min"] == "65536"
+        assert headers == {"Authorization": "Bearer featherless-secret"}
+        return httpx.Response(
+            200,
+            request=httpx.Request("GET", url),
+            json={
+                "models": [
+                    {
+                        "model_id": "working/model-one",
+                        "max_output_tokens": 8192,
+                    },
+                    {
+                        "name": "working/model-two",
+                        "context_window": 131072,
+                        "output_token_limit": 4096,
+                    },
+                ]
+            },
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+    router = FeatherlessModelRouter(api_key="featherless-secret")
+
+    assert await router.candidates("chief-control") == [
+        "working/model-one",
+        "working/model-two",
+    ]
 
 
 def test_failure_quarantines_and_success_sticks():

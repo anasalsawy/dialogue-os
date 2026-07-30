@@ -10,11 +10,12 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from dialogue_os.bridge import BridgeService
+from dialogue_os.bridge import BridgeService, _ChiefControlRouter
 from dialogue_os.channel.canonical import CanonicalChannel
 from dialogue_os.cursor.client import CursorClient
 from dialogue_os.cursor.control import parse_control_decision
 from dialogue_os.db.store import Store
+from dialogue_os.hermes.agent_client import HermesAgentClient
 from dialogue_os.maf.orchestration import Orchestrator
 from dialogue_os.telegram.api import (
     TELEGRAM_LIMIT,
@@ -38,6 +39,49 @@ def test_redact_telegram_token():
     token = "1234567890:AAHxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
     assert "[REDACTED" in redact_text(f"bot {token} failed")
     assert token not in redact_text(f"bot {token} failed")
+
+
+@pytest.mark.asyncio
+async def test_automated_supervision_uses_isolated_nonstored_chief_turn():
+    bridge = MagicMock()
+    bridge._chief_direct = AsyncMock(return_value=MagicMock(ok=True))
+    router = _ChiefControlRouter(bridge)
+
+    await router.chief_direct("inspect mission")
+
+    kwargs = bridge._chief_direct.await_args.kwargs
+    assert kwargs["conversation_key"].startswith("dialogue-os-supervision:")
+    assert kwargs["store_conversation"] is False
+
+
+@pytest.mark.asyncio
+async def test_operator_chief_abandons_polluted_shared_session(store: Store):
+    bridge = object.__new__(BridgeService)
+    bridge.settings = MagicMock()
+    bridge.settings.chief_backend = "hermes"
+    bridge.settings.telegram_owner_id = 42
+    bridge.hermes = HermesAgentClient(
+        base_url="http://127.0.0.1:8642",
+        api_key="runtime-secret",
+        store=store,
+    )
+    bridge.hermes.chat = AsyncMock(
+        return_value={
+            "ok": True,
+            "text": "ready",
+            "error": None,
+            "session_id": "new-chief-session",
+            "tool_events": [],
+            "model": "working/model",
+        }
+    )
+
+    decision = await bridge._chief_direct("hello chief")
+
+    assert decision.ok and decision.text == "ready"
+    kwargs = bridge.hermes.chat.await_args.kwargs
+    assert kwargs["conversation_key"] == "dialogue-os-chief-control:operator-v2"
+    assert kwargs["store_conversation"] is True
 
 
 def _assert_valid_chunks(text: str, chunks: list[str]) -> None:
