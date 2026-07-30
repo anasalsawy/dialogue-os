@@ -118,6 +118,9 @@ class AgentRegistry:
                 "telegram_bot_id": None,
                 "meta": {"historical_usernames": defn.get("historical_usernames") or []},
             }
+            if agent_id == "chief" and self.settings.chief_backend == "hermes":
+                record["backend"] = "hermes"
+                record["hermes_profile"] = "chief-control"
             if token:
                 identity = await self.validate_token(token)
                 if identity:
