@@ -81,6 +81,16 @@ def build_souls(
         "# Part I — Shared Runtime Kernel",
         "# Part II — Logical Tool Catalog",
     )
+    chief_overlay = (role_dir / "chief-control.md").read_text(
+        encoding="utf-8"
+    ).strip()
+    chief_output = destination / "chief-control" / "SOUL.md"
+    chief_output.parent.mkdir(parents=True, exist_ok=True)
+    chief_output.write_text(
+        f"{chief_overlay}{ethics_layer}\n\n{shared}\n",
+        encoding="utf-8",
+    )
+    generated.append(chief_output)
     growth = markdown_section(
         consolidated,
         "# Part V — Growth, Advertising, and Lead Generation Agent Role Prompt",
