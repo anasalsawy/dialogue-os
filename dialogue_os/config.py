@@ -145,6 +145,12 @@ class Settings(BaseSettings):
     mission_supervision_watcher: str = Field(
         default="watcher_alpha", alias="MISSION_SUPERVISION_WATCHER"
     )
+    watcher_telegram_alerts_enabled: bool = Field(
+        default=False, alias="WATCHER_TELEGRAM_ALERTS_ENABLED"
+    )
+    watcher_alert_cooldown_seconds: int = Field(
+        default=3600, alias="WATCHER_ALERT_COOLDOWN_SECONDS"
+    )
 
     health_bind: str = Field(default="127.0.0.1", alias="HEALTH_BIND")
     health_port: int = Field(default=8787, alias="HEALTH_PORT")
