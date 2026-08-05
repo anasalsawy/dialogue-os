@@ -56,8 +56,13 @@ fi
 if [ -d "$FRONTEND_DIR" ]; then
   echo "==> your-travel-agent-ccb6b77f: installing npm dependencies"
   cd "$FRONTEND_DIR"
+  # Prefer the deterministic lockfile install, but fall back to `npm install`
+  # when the committed package-lock.json is out of sync with package.json.
   if [ -f package-lock.json ]; then
-    npm ci
+    npm ci || {
+      echo "==> npm ci failed (lockfile out of sync); falling back to npm install"
+      npm install
+    }
   else
     npm install
   fi
