@@ -1,6 +1,6 @@
 {
   "name": "Dialogue OS",
-  "install": "bash .cursor/install.sh",
+  "install": "if [ -f .cursor/install.sh ]; then bash .cursor/install.sh; else bash repos/dialogue-os/.cursor/install.sh; fi",
   "repositoryDependencies": [
     "github.com/anasalsawy/dialogue-os-runtime",
     "github.com/anasalsawy/yta-assistant-travel-memory",
@@ -9,12 +9,12 @@
   "terminals": [
     {
       "name": "api",
-      "command": "cd ../yta-assistant-travel-memory && . .venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8000",
+      "command": "for d in ../yta-assistant-travel-memory repos/yta-assistant-travel-memory /agent/repos/yta-assistant-travel-memory; do [ -d \"$d\" ] && cd \"$d\" && break; done && . .venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8000",
       "description": "YTA-ASSISTANT FastAPI backend on http://localhost:8000 (health, memory, flights/hotels/cars endpoints)."
     },
     {
       "name": "web",
-      "command": "cd ../your-travel-agent-ccb6b77f && npm run dev",
+      "command": "for d in ../your-travel-agent-ccb6b77f repos/your-travel-agent-ccb6b77f /agent/repos/your-travel-agent-ccb6b77f; do [ -d \"$d\" ] && cd \"$d\" && break; done && npm run dev",
       "description": "Your Travel Agent Vite/React dev server on http://localhost:8080."
     }
   ],
