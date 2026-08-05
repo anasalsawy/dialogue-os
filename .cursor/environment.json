@@ -1,7 +1,6 @@
 {
   "name": "Dialogue OS",
   "install": "if [ -f .cursor/install.sh ]; then bash .cursor/install.sh; else bash repos/dialogue-os/.cursor/install.sh; fi",
-  "start": "if [ -f .cursor/install.sh ]; then bash .cursor/install.sh; else bash repos/dialogue-os/.cursor/install.sh; fi",
   "repositoryDependencies": [
     "github.com/anasalsawy/dialogue-os-runtime",
     "github.com/anasalsawy/yta-assistant-travel-memory",
@@ -10,13 +9,13 @@
   "terminals": [
     {
       "name": "api",
-      "command": "for d in ../yta-assistant-travel-memory repos/yta-assistant-travel-memory /agent/repos/yta-assistant-travel-memory; do [ -d \"$d\" ] && cd \"$d\" && break; done && . .venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port 8000",
-      "description": "YTA-ASSISTANT FastAPI backend on http://localhost:8000 (health, memory, flights/hotels/cars endpoints)."
+      "command": "for d in ../yta-assistant-travel-memory repos/yta-assistant-travel-memory /agent/repos/yta-assistant-travel-memory; do [ -d \"$d\" ] && cd \"$d\" && break; done; if [ ! -x .venv/bin/python ] || ! .venv/bin/python -c \"import fastapi\" >/dev/null 2>&1; then echo 'provisioning backend venv...'; rm -rf .venv && python3 -m venv .venv && .venv/bin/pip install -q --upgrade pip && .venv/bin/pip install -q -r requirements.txt; fi; [ -f .env ] || cp .env.example .env; . .venv/bin/activate && exec uvicorn app.main:app --host 0.0.0.0 --port 8000",
+      "description": "YTA-ASSISTANT FastAPI backend on http://localhost:8000 (self-provisions its Python venv if missing, then serves health/memory/flights/hotels/cars)."
     },
     {
       "name": "web",
-      "command": "for d in ../your-travel-agent-ccb6b77f repos/your-travel-agent-ccb6b77f /agent/repos/your-travel-agent-ccb6b77f; do [ -d \"$d\" ] && cd \"$d\" && break; done && npm run dev",
-      "description": "Your Travel Agent Vite/React dev server on http://localhost:8080."
+      "command": "for d in ../your-travel-agent-ccb6b77f repos/your-travel-agent-ccb6b77f /agent/repos/your-travel-agent-ccb6b77f; do [ -d \"$d\" ] && cd \"$d\" && break; done; [ -x node_modules/.bin/vite ] || npm ci || npm install; exec npm run dev",
+      "description": "Your Travel Agent Vite/React dev server on http://localhost:8080 (installs node_modules if missing)."
     }
   ],
   "ports": [
