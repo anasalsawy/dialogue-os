@@ -1,6 +1,7 @@
 {
   "name": "Dialogue OS",
   "install": "if [ -f .cursor/install.sh ]; then bash .cursor/install.sh; else bash repos/dialogue-os/.cursor/install.sh; fi",
+  "start": "if [ -f .cursor/install.sh ]; then bash .cursor/install.sh; else bash repos/dialogue-os/.cursor/install.sh; fi",
   "repositoryDependencies": [
     "github.com/anasalsawy/dialogue-os-runtime",
     "github.com/anasalsawy/yta-assistant-travel-memory",

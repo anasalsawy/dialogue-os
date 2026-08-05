@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
-# Idempotent install for the Dialogue OS multi-repo workspace.
+# Idempotent, self-healing setup for the Dialogue OS multi-repo workspace.
 # Prepares every runnable sibling repository checked out next to dialogue-os:
 #   - dialogue-os-runtime           (Python, stdlib-only test suite)
 #   - yta-assistant-travel-memory   (FastAPI backend)
 #   - your-travel-agent-ccb6b77f    (Vite/React web app)
-# Each step is guarded so the script succeeds even if a repo is absent.
+#
+# Used for BOTH the environment `install` (build time) and `start` (per boot),
+# so it must be safe to re-run and fast when work is already done. Environment
+# builds do not re-run `install` on every boot, and the per-boot repo checkout
+# can drop install artifacts (e.g. the backend venv), so `start` calls this to
+# reconcile whatever is missing. Each step is guarded so it succeeds even if a
+# repo is absent.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -36,17 +42,18 @@ fi
 
 # yta-assistant-travel-memory: Python venv + pinned requirements.
 if [ -d "$BACKEND_DIR" ]; then
-  echo "==> yta-assistant-travel-memory: creating venv and installing requirements"
   cd "$BACKEND_DIR"
-  if [ ! -x .venv/bin/python ]; then
-    rm -rf .venv
-    python3 -m venv .venv
+  if [ -x .venv/bin/python ] && .venv/bin/python -c "import fastapi, uvicorn, pydantic_settings" >/dev/null 2>&1; then
+    echo "==> yta-assistant-travel-memory: venv already provisioned, skipping"
+  else
+    echo "==> yta-assistant-travel-memory: creating venv and installing requirements"
+    [ -x .venv/bin/python ] || { rm -rf .venv; python3 -m venv .venv; }
+    # shellcheck disable=SC1091
+    . .venv/bin/activate
+    pip install --upgrade pip -q
+    pip install -q -r requirements.txt
+    deactivate
   fi
-  # shellcheck disable=SC1091
-  . .venv/bin/activate
-  pip install --upgrade pip -q
-  pip install -q -r requirements.txt
-  deactivate
   [ -f .env ] || cp .env.example .env
 else
   echo "==> yta-assistant-travel-memory not present, skipping"
@@ -54,17 +61,21 @@ fi
 
 # your-travel-agent-ccb6b77f: npm dependencies from the committed lockfile.
 if [ -d "$FRONTEND_DIR" ]; then
-  echo "==> your-travel-agent-ccb6b77f: installing npm dependencies"
   cd "$FRONTEND_DIR"
-  # Prefer the deterministic lockfile install, but fall back to `npm install`
-  # when the committed package-lock.json is out of sync with package.json.
-  if [ -f package-lock.json ]; then
-    npm ci || {
-      echo "==> npm ci failed (lockfile out of sync); falling back to npm install"
-      npm install
-    }
+  if [ -x node_modules/.bin/vite ]; then
+    echo "==> your-travel-agent-ccb6b77f: node_modules already present, skipping"
   else
-    npm install
+    echo "==> your-travel-agent-ccb6b77f: installing npm dependencies"
+    # Prefer the deterministic lockfile install, but fall back to `npm install`
+    # when the committed package-lock.json is out of sync with package.json.
+    if [ -f package-lock.json ]; then
+      npm ci || {
+        echo "==> npm ci failed (lockfile out of sync); falling back to npm install"
+        npm install
+      }
+    else
+      npm install
+    fi
   fi
 else
   echo "==> your-travel-agent-ccb6b77f not present, skipping"
