@@ -1,0 +1,30 @@
+flowchart TB
+  U[User Task] --> ORCH[Task Orchestrator]
+  ORCH --> EX
+  ORCH --> ST
+
+  subgraph EXEC[Executor Lobe]
+    EX[Executor Model]
+    EXT[Side-effect Tools<br/>browser · files · shell<br/>API writes · deploy · send]
+    EX --- EXT
+  end
+
+  subgraph STRAT[Strategist Lobe]
+    ST[Strategist Model]
+    STT[Sense/Judge Tools<br/>research · memory · risk<br/>tests · verifier · approval]
+    ST --- STT
+  end
+
+  EX <-->|typed envelopes<br/>plan · intent · permit · verify| ST
+
+  EXT --> TR[Tool Router<br/>exclusive ownership + permit check]
+  STT --> TR
+  TR --> LEDGER[(Append-only Permission Ledger)]
+
+  EX <--> WS[(Shared Workspace)]
+  ST <--> WS
+  EX <--> MEM[(Shared Memory)]
+  ST <--> MEM
+
+  WATCH[Watchdog<br/>stall · loop · heartbeat] -.-> ORCH
+  ORCH --> REPORT[Evidence-backed Final Report]

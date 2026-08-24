@@ -1,0 +1,13 @@
+flowchart TB
+  EV[Outcome events]
+  EV -- success --> ST1[reinforce verified strategy]
+  EV -- repeated errors --> ST2[increase caution / shorten horizon]
+  EV -- task switch --> ST3[increase context refresh]
+  EV -- long horizon --> ST4[increase patience / verification depth]
+  ST1 --> ST[(control state<br/>bounded 0..1 scalars)]
+  ST2 --> ST
+  ST3 --> ST
+  ST4 --> ST
+  ST --> CFG[execution + verification parameters]
+  CFG --> STR[Strategist]
+  CFG --> EXE[Executor]

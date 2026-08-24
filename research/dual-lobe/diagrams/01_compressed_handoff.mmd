@@ -1,0 +1,11 @@
+flowchart LR
+  subgraph S[Strategist]
+    SS[Private working context<br/>plans · doubts · hypotheses]
+  end
+  subgraph E[Executor]
+    ES[Private working context<br/>tool observations · results]
+  end
+  SS -- compress --> P{{handoff_packet<br/>goal · constraints<br/>facts · questions<br/>confidence}}
+  P -- bounded typed channel --> ES
+  ES -- compress --> P2{{handoff_packet<br/>result · surprises<br/>evidence · next ask}}
+  P2 --> SS

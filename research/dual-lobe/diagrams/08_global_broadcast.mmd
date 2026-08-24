@@ -1,0 +1,17 @@
+flowchart TB
+  subgraph MODS[Modules submit bids]
+    M1[Memory]
+    M2[Observations]
+    M3[Skill cache]
+    M4[Salience]
+    M5[Prediction error]
+  end
+  M1 --> WS[(priority bids)]
+  M2 --> WS
+  M3 --> WS
+  M4 --> WS
+  M5 --> WS
+  WS --> B{{bounded broadcast}}
+  B --> AC[active context]
+  AC --> STR[Strategist]
+  AC --> EXE[Executor]

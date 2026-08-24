@@ -1,0 +1,11 @@
+flowchart TB
+  A1[Memory candidate] --> G
+  A2[Sensory/tool observation] --> G
+  A3[Cached skill candidate] --> G
+  A4[Salience signal] --> G
+  A5[Prediction error] --> G
+  G{{context_gate<br/>score = relevance × gain<br/>keep top-K above threshold}}
+  G -->|admitted| CTX[Active context]
+  G -->|deferred| DROP[(not loaded this turn)]
+  CTX --> STR[Strategist]
+  CTX --> EXE[Executor]

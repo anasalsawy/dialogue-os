@@ -1,0 +1,8 @@
+stateDiagram-v2
+  [*] --> Consolidation
+  Consolidation: BACKGROUND MODE<br/>replay · curate · summarize
+  Active: ACTIVE TASK MODE<br/>Strategist + Executor loop
+  Consolidation --> Active: novelty/urgency > threshold
+  Active --> Consolidation: idle > T_idle<br/>or task complete
+  Active --> Active: material event
+  Consolidation --> Consolidation: low-signal tick

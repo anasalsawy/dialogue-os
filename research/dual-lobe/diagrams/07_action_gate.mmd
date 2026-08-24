@@ -1,0 +1,8 @@
+flowchart LR
+  STR[Candidate action] --> AG{{GO / NOGO / HOLD}}
+  POL[(risk · cost · policy<br/>failure history · authorization)] --> AG
+  AG -- GO --> EXE[Executor]
+  AG -- NOGO --> BLK[blocked + logged]
+  AG -- HOLD --> REV[additional review / human authorization]
+  EXE --> LOG[(decision + outcome log)]
+  BLK --> LOG

@@ -1,0 +1,15 @@
+flowchart LR
+  subgraph LONG[Long-term stores]
+    SES[(session summary)]
+    FIX[(verified durable memory)]
+  end
+  subgraph WM[Explicit working-memory slots]
+    S1[goal]
+    S2[critical constraint]
+    S3[current state]
+    S4[last surprise/blocker]
+  end
+  LONG -. retrieve relevant items .-> WM
+  STR[Strategist] <-->|read/write| WM
+  EXE[Executor] <-->|read/write| WM
+  WM -->|relevance-based replacement| DROP[(deferred)]

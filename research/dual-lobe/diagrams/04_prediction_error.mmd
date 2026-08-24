@@ -1,0 +1,8 @@
+flowchart LR
+  S[Strategist] -- predicted outcome --> P[(predictions)]
+  S -- approved plan --> E[Executor]
+  E -- observed outcome --> P
+  P --> D{difference<br/>actual vs expected}
+  D -- small --> SILENT[confirmed / low-priority]
+  D -- large --> UP[high-priority surprise signal]
+  UP --> S

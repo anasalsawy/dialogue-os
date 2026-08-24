@@ -1,0 +1,10 @@
+flowchart LR
+  T[New task] --> M{verified cached skill?}
+  M -- no --> DL[Dual-Lobe deliberation]
+  DL --> WIN[verified success trace]
+  WIN --> COMP[compile procedure + expected result]
+  COMP --> SK[(skill cache)]
+  M -- yes --> RUN[execute bounded skill]
+  RUN --> CMP{expected vs actual}
+  CMP -- match --> OK[retain]
+  CMP -- repeated mismatch --> DEMO[demote to supervised]

@@ -1,0 +1,12 @@
+flowchart TB
+  EP[(episodic traces<br/>verified + failed runs)]
+  subgraph IDLE[Idle / consolidation window]
+    SEL[select high-surprise<br/>or low-confidence traces]
+    BATCH[batch with provenance]
+    ASK[Strategist:<br/>candidate lesson?]
+  end
+  EP --> SEL --> BATCH --> ASK
+  ASK --> CAND[(candidate rules<br/>with provenance)]
+  CAND --> VAL{later validation}
+  VAL -- supported --> FIX[(durable memory)]
+  VAL -- unsupported --> DROP[(discard)]
